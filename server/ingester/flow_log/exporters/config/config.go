@@ -21,6 +21,9 @@ type ExportersCfg struct {
 	// OtlpExporter config for OTLP exporter
 	OtlpExporterCfg OtlpExporterConfig `yaml:"otlp-exporter"`
 
+	// Prometheus exporter config
+	PrometheusExporterCfg PrometheusExporterConfig `yaml:"prometheus-exporter"`
+
 	// other exporter config ...
 }
 
