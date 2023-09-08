@@ -7,7 +7,10 @@ import (
 
 // PrometheusExporterConfig defines setting for prometheus exporter
 type PrometheusExporterConfig struct {
-	HTTPServer HTTPServerSettings `yaml:"http-server"`
+	HTTPServerSettings `yaml:"http-server,inline"`
+
+	// Enabled defined if prometheus exporter is enabled.
+	Enabled bool `yaml:"enabled"`
 
 	// Namespace if set, exports metrics under the provided value.
 	Namespace string `yaml:"namespace"`

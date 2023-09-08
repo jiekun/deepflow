@@ -56,8 +56,6 @@ type Exporters struct {
 	putCaches            []ExportersCache // cache for batch put to exporter, multi flowlog decoders call Put(), and put to multi exporters
 }
 
-var availableExporters = map[string]Exporter{}
-
 func NewExporters(flowlogCfg *config.Config) *Exporters {
 	exportersCfg := &flowlogCfg.ExportersCfg
 	if !exportersCfg.Enabled {
@@ -73,6 +71,10 @@ func NewExporters(flowlogCfg *config.Config) *Exporters {
 	if exportersCfg.OtlpExporterCfg.Enabled {
 		otlpExporter := otlp_exporter.NewOtlpExporter(exportersCfg, universalTagManager)
 		exporters = append(exporters, otlpExporter)
+	}
+
+	if exportersCfg.OtlpExporterCfg.Enabled {
+
 	}
 
 	// todo add other exporters....
