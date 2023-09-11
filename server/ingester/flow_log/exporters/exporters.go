@@ -68,9 +68,11 @@ func NewExporters(flowlogCfg *config.Config) *Exporters {
 
 	universalTagManager := universal_tag.NewUniversalTagsManager(exportersCfg.ExportCustomK8sLabelsRegexp, flowlogCfg.Base)
 
-	if exportersCfg.OtlpExporterCfg.Enabled {
-		otlpExporter := otlp_exporter.NewOtlpExporter(exportersCfg, universalTagManager)
-		exporters = append(exporters, otlpExporter)
+	for i := range exportersCfg.OtlpExporterCfgs {
+		if exportersCfg.OtlpExporterCfgs[i].Enabled {
+			otlpExporter := otlp_exporter.NewOtlpExporter(i, exportersCfg, universalTagManager)
+			exporters = append(exporters, otlpExporter)
+		}
 	}
 
 	if exportersCfg.OtlpExporterCfg.Enabled {
@@ -109,25 +111,13 @@ func (es *Exporters) Close() {
 	}
 }
 
-func (es *Exporters) IsExportData(l *log_data.L7FlowLog) bool {
-	if es.config.ExportOnlyWithTraceID && l.TraceId == "" {
-		return false
-	}
-	if (1<<uint32(l.SignalSource))&es.config.ExportDataBits == 0 {
-		return false
-	}
-	return true
-}
-
 // parallel put
 func (es *Exporters) Put(l *log_data.L7FlowLog, decoderIndex int) {
 	if l == nil {
 		es.Flush(decoderIndex)
 		return
 	}
-	if !es.IsExportData(l) {
-		return
-	}
+
 	exportersCache := es.putCaches[decoderIndex]
 	for i, e := range es.exporters {
 		if e.IsExportData(l) {

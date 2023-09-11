@@ -314,7 +314,7 @@ func (r *PlatformRawData) ConvertDBVInterface(dbDataCache *DBDataCache) {
 			} else {
 				r.hostIDToVifs[vif.DeviceID] = mapset.NewSet(vif)
 			}
-			if Find[int](r.gatewayHostIDs, vif.ID) {
+			if Find[int](r.gatewayHostIDs, vif.DeviceID) {
 				if vifs, ok := r.gatewayHostIDToVifs[vif.DeviceID]; ok {
 					vifs.Add(vif)
 				} else {
@@ -628,7 +628,7 @@ func (r *PlatformRawData) ConvertHost(dbDataCache *DBDataCache) {
 			AZ:             host.AZ,
 			Type:           VIF_DEVICE_TYPE_HOST,
 		}
-		if host.Type == HOST_HTYPE_GATEWAY {
+		if host.HType == HOST_HTYPE_GATEWAY {
 			r.gatewayHostIDs = append(r.gatewayHostIDs, host.ID)
 		}
 	}
@@ -1186,10 +1186,6 @@ func (r *PlatformRawData) vInterfaceToProto(
 		NetnsId:        proto.Uint32(vif.NetnsID),
 		VtapId:         proto.Uint32(vif.VtapID),
 	}
-	vMacU64, err := MacStrToU64(vif.VMac)
-	if err != nil {
-		log.Error(err, vif.VMac)
-	}
 	sInterface := &trident.Interface{
 		Id:             proto.Uint32(uint32(vif.ID)),
 		Mac:            proto.Uint64(macU64),
@@ -1201,7 +1197,6 @@ func (r *PlatformRawData) vInterfaceToProto(
 		PodClusterId:   proto.Uint32(uint32(device.PodClusterID)),
 		PodNodeId:      proto.Uint32(uint32(device.PodNodeID)),
 		IsVipInterface: proto.Bool(ipResourceData.isVipInterface),
-		Vmac:           proto.Uint64(vMacU64),
 	}
 
 	return &InterfaceProto{aInterface: aInterface, sInterface: sInterface}, nil

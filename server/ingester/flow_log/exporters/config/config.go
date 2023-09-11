@@ -8,44 +8,36 @@ import (
 
 var log = logging.MustGetLogger("exporters_config")
 
-// ExporterCfg holds configs of different exporters.
-type ExportersCfg struct {
-	Enabled                     bool     `yaml:"enabled"`
+type OverridableCfg struct {
 	ExportDatas                 []string `yaml:"export-datas"`
 	ExportDataBits              uint32   // generate from 'ExportDatas'
 	ExportDataTypes             []string `yaml:"export-data-types"`
 	ExportDataTypeBits          uint32   // generate from 'ExportDataTypes'
 	ExportCustomK8sLabelsRegexp string   `yaml:"export-custom-k8s-labels-regexp"`
-	ExportOnlyWithTraceID       bool     `yaml:"export-only-with-traceid"`
-
-	// OtlpExporter config for OTLP exporter
-	OtlpExporterCfg OtlpExporterConfig `yaml:"otlp-exporter"`
-
-	// Prometheus exporter config
-	PrometheusExporterCfg PrometheusExporterConfig `yaml:"prometheus-exporter"`
-
-	// other exporter config ...
+	ExportOnlyWithTraceID       *bool    `yaml:"export-only-with-traceid"`
 }
 
-func (ec *ExportersCfg) calcDataBits() {
-	for _, v := range ec.ExportDatas {
-		ec.ExportDataBits |= uint32(StringToExportedData(v))
-	}
-	log.Infof("export data bits: %08b, string: %s", ec.ExportDataBits, ExportedDataBitsToString(ec.ExportDataBits))
+// ExporterCfg holds configs of different exporters.
+type ExportersCfg struct {
+	Enabled bool `yaml:"enabled"`
 
-	for _, v := range ec.ExportDataTypes {
-		ec.ExportDataTypeBits |= uint32(StringToExportedDataType(v))
-	}
-	if ec.ExportCustomK8sLabelsRegexp != "" {
-		ec.ExportDataTypeBits |= K8S_LABEL
-	}
-	log.Infof("export data type bits: %08b, string: %s", ec.ExportDataTypeBits, ExportedDataTypeBitsToString(ec.ExportDataTypeBits))
+	// global config, could be overridden by same fields under each exporter.
+	OverridableCfg `yaml:",inline"`
+
+	// OtlpExporter config for OTLP exporters
+	OtlpExporterCfgs []OtlpExporterConfig `yaml:"otlp-exporters"`
+
+	// Prometheus exporter config
+	PrometheusExporterCfg []PrometheusExporterConfig `yaml:"prometheus-exporter"`
+
+	// other exporter configs ...
 }
 
 func (ec *ExportersCfg) Validate() error {
-	ec.calcDataBits()
-	if err := ec.OtlpExporterCfg.Validate(); err != nil {
-		return err
+	for i := range ec.OtlpExporterCfgs {
+		if err := ec.OtlpExporterCfgs[i].Validate(ec.OverridableCfg); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -55,10 +47,12 @@ var DefaultOtlpExportDataTypes = []string{"service_info", "tracing_info", "netwo
 
 func NewDefaultExportersCfg() ExportersCfg {
 	return ExportersCfg{
-		Enabled:         false,
-		ExportDatas:     DefaultOtlpExportDatas,
-		ExportDataTypes: DefaultOtlpExportDataTypes,
-		OtlpExporterCfg: NewOtlpDefaultConfig(),
+		Enabled: false,
+		OverridableCfg: OverridableCfg{
+			ExportDatas:     DefaultOtlpExportDatas,
+			ExportDataTypes: DefaultOtlpExportDataTypes,
+		},
+		OtlpExporterCfgs: []OtlpExporterConfig{NewOtlpDefaultConfig()},
 	}
 }
 

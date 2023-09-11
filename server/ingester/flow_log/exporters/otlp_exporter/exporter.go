@@ -18,6 +18,7 @@ package otlp_exporter
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	logging "github.com/op/go-logging"
@@ -46,6 +47,7 @@ const (
 )
 
 type OtlpExporter struct {
+	index                int
 	Addr                 string
 	dataQueues           queue.FixedMultiQueue
 	queueCount           int
@@ -55,7 +57,6 @@ type OtlpExporter struct {
 	config               *exporters_cfg.OtlpExporterConfig
 	counter              *Counter
 	lastCounter          Counter
-	exportDataTypeBits   uint32
 	running              bool
 
 	utils.Closable
@@ -82,33 +83,41 @@ type ExportItem interface {
 	Release()
 }
 
-func NewOtlpExporter(config *exporters_cfg.ExportersCfg, universalTagsManager *utag.UniversalTagsManager) *OtlpExporter {
-	otlpConfig := config.OtlpExporterCfg
+func NewOtlpExporter(index int, config *exporters_cfg.ExportersCfg, universalTagsManager *utag.UniversalTagsManager) *OtlpExporter {
+	otlpConfig := config.OtlpExporterCfgs[index]
 
 	dataQueues := queue.NewOverwriteQueues(
-		"otlp_exporter", queue.HashKey(otlpConfig.QueueCount), otlpConfig.QueueSize,
+		fmt.Sprintf("otlp_exporter_%d", index), queue.HashKey(otlpConfig.QueueCount), otlpConfig.QueueSize,
 		queue.OptionFlushIndicator(time.Second),
 		queue.OptionRelease(func(p interface{}) { p.(ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
 	exporter := &OtlpExporter{
+		index:                index,
 		dataQueues:           dataQueues,
 		queueCount:           otlpConfig.QueueCount,
 		universalTagsManager: universalTagsManager,
 		grpcConns:            make([]*grpc.ClientConn, otlpConfig.QueueCount),
 		grpcExporters:        make([]ptraceotlp.GRPCClient, otlpConfig.QueueCount),
 		config:               &otlpConfig,
-		exportDataTypeBits:   config.ExportDataTypeBits,
 		counter:              &Counter{},
 	}
 	debug.ServerRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, exporter)
 	common.RegisterCountableForIngester("exporter", exporter, stats.OptionStatTags{
-		"type": "otlp"})
-	log.Info("otlp exporter created")
+		"type": "otlp", "index": strconv.Itoa(index)})
+	log.Infof("otlp exporter %d created", index)
 	return exporter
 }
 
 func (e *OtlpExporter) IsExportData(l *log_data.L7FlowLog) bool {
+	if e.config.ExportOnlyWithTraceID != nil && *e.config.ExportOnlyWithTraceID && l.TraceId == "" {
+		return false
+	}
+
+	if (1<<uint32(l.SignalSource))&e.config.ExportDataBits == 0 {
+		return false
+	}
+
 	// always not export data from OTel
 	if l.SignalSource == uint16(datatype.SIGNAL_SOURCE_OTEL) {
 		e.counter.DropCounter++
@@ -124,19 +133,19 @@ func (e *OtlpExporter) Put(items ...interface{}) {
 
 func (e *OtlpExporter) Start() {
 	if e.running {
-		log.Warning("otlp exporter already running")
+		log.Warningf("otlp exporter %d already running", e.index)
 		return
 	}
 	e.running = true
 	for i := 0; i < e.queueCount; i++ {
 		go e.queueProcess(int(i))
 	}
-	log.Infof("otlp exporter started %d queue", e.queueCount)
+	log.Infof("otlp exporter %d started %d queue", e.index, e.queueCount)
 }
 
 func (e *OtlpExporter) Close() {
 	e.running = false
-	log.Info("otlp exporter stopping")
+	log.Infof("otlp exporter %d stopping", e.index)
 }
 
 func (e *OtlpExporter) queueProcess(queueID int) {
@@ -164,7 +173,7 @@ func (e *OtlpExporter) queueProcess(queueID int) {
 			switch t := flow.(type) {
 			case (*log_data.L7FlowLog):
 				f := flow.(*log_data.L7FlowLog)
-				L7FlowLogToExportResourceSpans(f, e.universalTagsManager, e.exportDataTypeBits, traces.ResourceSpans().AppendEmpty())
+				L7FlowLogToExportResourceSpans(f, e.universalTagsManager, e.config.ExportDataTypeBits, traces.ResourceSpans().AppendEmpty())
 				batchCount++
 				if batchCount >= e.config.ExportBatchCount {
 					if err := e.grpcExport(ctx, queueID, ptraceotlp.NewExportRequestFromTraces(traces)); err == nil {
@@ -198,7 +207,7 @@ func (e *OtlpExporter) grpcExport(ctx context.Context, i int, req ptraceotlp.Exp
 	_, err := e.grpcExporters[i].Export(ctx, req)
 	if err != nil {
 		if e.counter.DropCounter == 0 {
-			log.Warningf("send grpc traces failed. err: %s", err)
+			log.Warningf("exporter %d send grpc traces failed. err: %s", e.index, err)
 		}
 		e.counter.DropCounter++
 		e.grpcExporters[i] = nil
@@ -227,5 +236,5 @@ func (e *OtlpExporter) newGrpcExporter(i int) error {
 }
 
 func (e *OtlpExporter) HandleSimpleCommand(op uint16, arg string) string {
-	return fmt.Sprintf("last 10s counter: %+v", e.lastCounter)
+	return fmt.Sprintf("otlp exporter %d last 10s counter: %+v", e.index, e.lastCounter)
 }
