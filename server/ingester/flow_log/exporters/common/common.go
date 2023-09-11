@@ -171,3 +171,7 @@ func RapSideToName(tapSide string) string {
 	}
 	return tapSide
 }
+
+type ExportItem interface {
+	Release()
+}

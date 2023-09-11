@@ -18,17 +18,13 @@ type PrometheusExporterConfig struct {
 	// ConstLabels are values that are applied for every exported metric.
 	ConstLabels prometheus.Labels `yaml:"const-labels"`
 
-	// SendTimestamps will send the underlying scrape timestamp with the export
-	SendTimestamps bool `yaml:"send-timestamps"`
-
 	// MetricExpiration defines how long metrics are kept without updates
 	MetricExpiration time.Duration `yaml:"metric-expiration"`
 
-	// EnableOpenMetrics enables the use of the OpenMetrics encoding option for the prometheus exporter.
-	EnableOpenMetrics bool `yaml:"enable_open-metrics"`
+	QueueCount int `yaml:"queue-count"`
+	QueueSize  int `yaml:"queue-size"`
 
-	// AddMetricSuffixes controls whether suffixes are added to metric names. Defaults to true.
-	AddMetricSuffixes bool `yaml:"add_metric-suffixes"`
+	OverridableCfg `yaml:",inline"`
 }
 
 // HTTPServerSettings defines settings for creating an prometheus exporter HTTP server.

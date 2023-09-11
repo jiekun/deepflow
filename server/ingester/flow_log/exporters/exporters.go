@@ -17,6 +17,7 @@
 package exporters
 
 import (
+	prometheus_exporter "github.com/deepflowio/deepflow/server/ingester/flow_log/exporters/prometheus-exporter"
 	logging "github.com/op/go-logging"
 
 	"github.com/deepflowio/deepflow/server/ingester/flow_log/config"
@@ -75,8 +76,9 @@ func NewExporters(flowlogCfg *config.Config) *Exporters {
 		}
 	}
 
-	if exportersCfg.OtlpExporterCfg.Enabled {
-
+	for i := range exportersCfg.PrometheusExporterCfg {
+		prometheusExporter := prometheus_exporter.NewPrometheusExporter(i, exportersCfg, universalTagManager)
+		exporters = append(exporters, prometheusExporter)
 	}
 
 	// todo add other exporters....

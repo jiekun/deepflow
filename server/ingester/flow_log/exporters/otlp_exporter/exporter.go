@@ -18,6 +18,7 @@ package otlp_exporter
 
 import (
 	"fmt"
+	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporters/common"
 	"strconv"
 	"time"
 
@@ -79,17 +80,13 @@ func (e *OtlpExporter) GetCounter() interface{} {
 	return &counter
 }
 
-type ExportItem interface {
-	Release()
-}
-
 func NewOtlpExporter(index int, config *exporters_cfg.ExportersCfg, universalTagsManager *utag.UniversalTagsManager) *OtlpExporter {
 	otlpConfig := config.OtlpExporterCfgs[index]
 
 	dataQueues := queue.NewOverwriteQueues(
 		fmt.Sprintf("otlp_exporter_%d", index), queue.HashKey(otlpConfig.QueueCount), otlpConfig.QueueSize,
 		queue.OptionFlushIndicator(time.Second),
-		queue.OptionRelease(func(p interface{}) { p.(ExportItem).Release() }),
+		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
 	exporter := &OtlpExporter{
