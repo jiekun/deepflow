@@ -18,13 +18,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 var (
 	log                          = logging.MustGetLogger("prometheus_exporter")
 	deepFlowRemoteRequestSummary *prometheus.SummaryVec
+	serviceNameRegex             *regexp.Regexp
 )
 
 const (
@@ -52,6 +55,8 @@ func init() {
 		"protocol",
 	})
 	prometheus.MustRegister(deepFlowRemoteRequestSummary)
+
+	serviceNameRegex, _ = regexp.Compile("^[a-zA-Z].+")
 }
 
 func (e *PrometheusExporter) GetCounter() interface{} {
@@ -171,6 +176,11 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					serviceName = tags1.AutoService
 				}
 
+				if !serviceNameRegex.MatchString(serviceName) || side == "server" {
+					f.Release()
+					return
+				}
+
 				switch datatype.LogMessageStatus(f.ResponseStatus) {
 				case datatype.STATUS_OK:
 					status = "0"
@@ -229,9 +239,11 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 		// e.g.: /oteldemo.CheckoutService/PlaceOrder
 		endpoint = l7.Endpoint
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
-		// e.g.: my-otel-demo-frontend:8080/api/products/0PUK6V6EV0
-		endpoint = l7.RequestDomain + l7.RequestResource
-
+		if strings.HasPrefix(strings.ToLower(l7.RequestResource), "http") {
+			endpoint = l7.RequestResource
+		} else {
+			endpoint = l7.RequestDomain + l7.RequestResource
+		}
 	}
 	return endpoint
 }
