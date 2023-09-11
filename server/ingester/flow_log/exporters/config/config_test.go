@@ -36,9 +36,10 @@ func TestConfig(t *testing.T) {
 				Enabled: false,
 				PrometheusExporterCfg: []PrometheusExporterConfig{
 					{
-						Namespace:  "test",
-						QueueCount: 4,
-						QueueSize:  100000,
+						Namespace:      "test",
+						ProtocolFilter: []string{"http", "https", "http2", "https2", "mysql", "redis", "kafka", "mqtt", "grpc", "protobuf_rpc"},
+						QueueCount:     4,
+						QueueSize:      100000,
 						HTTPServerSettings: HTTPServerSettings{
 							Endpoint: "127.0.0.1:4317",
 						},

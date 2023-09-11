@@ -29,6 +29,22 @@ var (
 	log                          = logging.MustGetLogger("prometheus_exporter")
 	deepFlowRemoteRequestSummary *prometheus.SummaryVec
 	serviceNameRegex             *regexp.Regexp
+	protocolMap                  = map[string]datatype.L7Protocol{
+		"http":         datatype.L7_PROTOCOL_HTTP_1,
+		"https":        datatype.L7_PROTOCOL_HTTP_1_TLS,
+		"http/2":       datatype.L7_PROTOCOL_HTTP_2,
+		"https/2":      datatype.L7_PROTOCOL_HTTP_2_TLS,
+		"dubbo":        datatype.L7_PROTOCOL_DUBBO,
+		"grpc":         datatype.L7_PROTOCOL_GRPC,
+		"protobuf_rpc": datatype.L7_PROTOCOL_PROTOBUF_RPC,
+		"sofarpc":      datatype.L7_PROTOCOL_SOFARPC,
+		"fastcgi":      datatype.L7_PROTOCOL_FASTCGI,
+		"mysql":        datatype.L7_PROTOCOL_MYSQL,
+		"postgre":      datatype.L7_PROTOCOL_POSTGRE,
+		"redis":        datatype.L7_PROTOCOL_REDIS,
+		"kafka":        datatype.L7_PROTOCOL_KAFKA,
+		"mqtt":         datatype.L7_PROTOCOL_MQTT,
+	}
 )
 
 const (
@@ -71,12 +87,13 @@ type PrometheusExporter struct {
 	cfg         *exporters_cfg.PrometheusExporterConfig
 	constLabels prometheus.Labels
 
-	index       int
-	dataQueues  queue.FixedMultiQueue
-	queueCount  int
-	counter     *Counter
-	lastCounter Counter
-	running     bool
+	index             int
+	protocolFilterMap map[datatype.L7Protocol]bool
+	dataQueues        queue.FixedMultiQueue
+	queueCount        int
+	counter           *Counter
+	lastCounter       Counter
+	running           bool
 
 	universalTagsManager *utag.UniversalTagsManager
 	utils.Closable
@@ -91,10 +108,18 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		queue.OptionRelease(func(p interface{}) { p.(exporter_common.ExportItem).Release() }),
 		common.QUEUE_STATS_MODULE_INGESTER)
 
+	protocolFilter := make(map[datatype.L7Protocol]bool)
+	for i := range promExporterCfg.ProtocolFilter {
+		if v, ok := protocolMap[promExporterCfg.ProtocolFilter[i]]; ok {
+			protocolFilter[v] = true
+		}
+	}
+
 	exporter := &PrometheusExporter{
 		cfg: &promExporterCfg,
 
 		index:                index,
+		protocolFilterMap:    protocolFilter,
 		dataQueues:           dataQueues,
 		queueCount:           promExporterCfg.QueueCount,
 		universalTagsManager: universalTagsManager,
@@ -133,6 +158,11 @@ func (e *PrometheusExporter) Put(items ...interface{}) {
 func (e *PrometheusExporter) IsExportData(l *log_data.L7FlowLog) bool {
 	// always not export data from OTel
 	if l.SignalSource != uint16(datatype.SIGNAL_SOURCE_EBPF) {
+		e.counter.DropCounter++
+		return false
+	}
+
+	if !e.protocolFilterMap[datatype.L7Protocol(l.L7Protocol)] {
 		e.counter.DropCounter++
 		return false
 	}
@@ -237,8 +267,14 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 		}
 
 		// try to remove query params
-		if u, err := url.ParseRequestURI(endpoint); err != nil {
+		log.Debugf("HTTP endpoint: %s", endpoint)
+		tmpEndpoint := endpoint
+		if !strings.HasPrefix(endpoint, "http") {
+			tmpEndpoint = "https://" + endpoint
+		}
+		if u, err := url.ParseRequestURI(tmpEndpoint); err == nil {
 			endpoint = u.Host + u.Path
+			log.Debugf("HTTP new endpoint: %s", endpoint)
 		}
 	}
 	return endpoint

@@ -18,6 +18,9 @@ type PrometheusExporterConfig struct {
 	// MetricExpiration defines how long metrics are kept without updates
 	MetricExpiration time.Duration `yaml:"metric-expiration"`
 
+	// ProtocolFilter defines L7 Protocols that could be export
+	ProtocolFilter []string `yaml:"protocol-filter"`
+
 	QueueCount int `yaml:"queue-count"`
 	QueueSize  int `yaml:"queue-size"`
 
