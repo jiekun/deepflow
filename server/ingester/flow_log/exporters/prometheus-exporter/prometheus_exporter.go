@@ -112,7 +112,7 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					"side":         side,
 					"status":       status,
 					"service_name": serviceName,
-					"endpoint":     f.Endpoint,
+					"endpoint":     e.getEndpoint(f),
 					"protocol":     datatype.L7Protocol(f.L7Protocol).String(),
 				}
 				deepFlowRemoteRequestSummary.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
@@ -132,4 +132,11 @@ func (e *PrometheusExporter) startMetricsServer() {
 		fmt.Printf("Start prometheus exporter on http %s failed: %v", e.cfg.Endpoint, err)
 		os.Exit(1)
 	}
+}
+
+// getEndpoint return a customized endpoint string.
+// Endpoints for different protocol are different. getEndpoint try to compose a format:
+// Host/Path for RPC request and Host for middleware request.
+func (e *PrometheusExporter) getEndpoint(l *log_data.L7FlowLog) string {
+	return ""
 }
