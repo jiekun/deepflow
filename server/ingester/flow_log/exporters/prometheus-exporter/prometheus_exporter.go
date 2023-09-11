@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -117,17 +118,6 @@ func (e *PrometheusExporter) Start() {
 	}
 
 	go e.startMetricsServer()
-
-	go func() {
-		for {
-			resp, _ := http.Get(e.cfg.Endpoint + "/metrics")
-			result := []byte{}
-			resp.Body.Read(result)
-			log.Info(result)
-			time.Sleep(10 * time.Second)
-
-		}
-	}()
 }
 
 func (e *PrometheusExporter) Close() {
@@ -150,6 +140,7 @@ func (e *PrometheusExporter) IsExportData(l *log_data.L7FlowLog) bool {
 }
 
 func (e *PrometheusExporter) queueProcess(queueID int) {
+	defer log.Warningf("prometheus exporter queue worker %d exit", queueID)
 	flows := make([]interface{}, QUEUE_BATCH_COUNT)
 
 	for e.running {
@@ -178,7 +169,7 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 
 				if !serviceNameRegex.MatchString(serviceName) || side == "server" {
 					f.Release()
-					return
+					continue
 				}
 
 				switch datatype.LogMessageStatus(f.ResponseStatus) {
@@ -243,6 +234,11 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 			endpoint = l7.RequestResource
 		} else {
 			endpoint = l7.RequestDomain + l7.RequestResource
+		}
+
+		// try to remove query params
+		if u, err := url.ParseRequestURI(endpoint); err != nil {
+			endpoint = u.Host + u.Path
 		}
 	}
 	return endpoint
