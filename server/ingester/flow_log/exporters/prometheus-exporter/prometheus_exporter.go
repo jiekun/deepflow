@@ -44,7 +44,13 @@ type Counter struct {
 func init() {
 	deepFlowRemoteRequestSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
 		Name: "deepflow_remote_request_duration",
-	}, []string{})
+	}, []string{
+		"side",
+		"status",
+		"service_name",
+		"endpoint",
+		"protocol",
+	})
 	prometheus.MustRegister(deepFlowRemoteRequestSummary)
 }
 
@@ -106,6 +112,17 @@ func (e *PrometheusExporter) Start() {
 	}
 
 	go e.startMetricsServer()
+
+	go func() {
+		for {
+			resp, _ := http.Get(e.cfg.Endpoint + "/metrics")
+			result := []byte{}
+			resp.Body.Read(result)
+			log.Info(result)
+			time.Sleep(10 * time.Second)
+
+		}
+	}()
 }
 
 func (e *PrometheusExporter) Close() {
@@ -196,9 +213,9 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 	var endpoint string
 	switch datatype.L7Protocol(l7.L7Protocol) {
 	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE:
-		// e.g.: SELECT / UPDATE
-		_, operation := exporter_common.GetSQLSpanNameAndOperation(l7.RequestResource)
-		endpoint = operation
+		// e.g.: SELECT my_tab / UPDATE user_info_table
+		stmtType, tableName := GetStmtTypeAndTableName(l7.RequestResource)
+		endpoint = stmtType + " " + tableName
 	case datatype.L7_PROTOCOL_REDIS:
 		// e.g.: GET
 		endpoint = l7.RequestType
