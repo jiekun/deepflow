@@ -26,10 +26,9 @@ import (
 )
 
 var (
-	log                          = logging.MustGetLogger("prometheus_exporter")
-	deepFlowRemoteRequestSummary *prometheus.SummaryVec
-	serviceNameRegex             *regexp.Regexp
-	protocolMap                  = map[string]datatype.L7Protocol{
+	log              = logging.MustGetLogger("prometheus_exporter")
+	serviceNameRegex *regexp.Regexp
+	protocolMap      = map[string]datatype.L7Protocol{
 		"http":         datatype.L7_PROTOCOL_HTTP_1,
 		"https":        datatype.L7_PROTOCOL_HTTP_1_TLS,
 		"http/2":       datatype.L7_PROTOCOL_HTTP_2,
@@ -62,17 +61,6 @@ type Counter struct {
 }
 
 func init() {
-	deepFlowRemoteRequestSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
-		Name: "deepflow_remote_request_duration",
-	}, []string{
-		"side",
-		"status",
-		"service_name",
-		"endpoint",
-		"protocol",
-	})
-	prometheus.MustRegister(deepFlowRemoteRequestSummary)
-
 	serviceNameRegex, _ = regexp.Compile("^[a-zA-Z].+")
 }
 
@@ -87,13 +75,15 @@ type PrometheusExporter struct {
 	cfg         *exporters_cfg.PrometheusExporterConfig
 	constLabels prometheus.Labels
 
-	index             int
-	protocolFilterMap map[datatype.L7Protocol]bool
-	dataQueues        queue.FixedMultiQueue
-	queueCount        int
-	counter           *Counter
-	lastCounter       Counter
-	running           bool
+	index                        int
+	protocolFilterMap            map[datatype.L7Protocol]bool
+	serviceFilterMap             map[string]bool
+	dataQueues                   queue.FixedMultiQueue
+	queueCount                   int
+	counter                      *Counter
+	lastCounter                  Counter
+	running                      bool
+	deepFlowRemoteRequestSummary *prometheus.SummaryVec
 
 	universalTagsManager *utag.UniversalTagsManager
 	utils.Closable
@@ -115,16 +105,40 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		}
 	}
 
+	serviceFilter := make(map[string]bool)
+	for i := range promExporterCfg.ServiceFilter {
+		serviceFilter[promExporterCfg.ServiceFilter[i]] = true
+	}
+
+	if len(promExporterCfg.ServiceFilter) == 0 {
+		serviceFilter["*"] = true
+	}
+
 	exporter := &PrometheusExporter{
 		cfg: &promExporterCfg,
 
 		index:                index,
 		protocolFilterMap:    protocolFilter,
+		serviceFilterMap:     serviceFilter,
 		dataQueues:           dataQueues,
 		queueCount:           promExporterCfg.QueueCount,
 		universalTagsManager: universalTagsManager,
 		counter:              &Counter{},
 	}
+
+	exporter.deepFlowRemoteRequestSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name:        "deepflow_remote_request_duration",
+		Namespace:   promExporterCfg.Namespace,
+		ConstLabels: promExporterCfg.ConstLabels,
+	}, []string{
+		"side",
+		"status",
+		"service_name",
+		"endpoint",
+		"protocol",
+	})
+	prometheus.MustRegister(exporter.deepFlowRemoteRequestSummary)
+
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, exporter)
 	common.RegisterCountableForIngester("exporter", exporter, stats.OptionStatTags{
 		"type": "prometheus", "index": strconv.Itoa(index)})
@@ -197,7 +211,11 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					serviceName = tags1.AutoService
 				}
 
-				if !serviceNameRegex.MatchString(serviceName) || side == "server" {
+				// not export if:
+				// 1. service not legal (not starts with a-zA-Z, e.g. an IP address).
+				// 2. service name filter is working (not containing "*" which means export all) and service name not in filter whitelist.
+				// 3. server side flow_log.
+				if !serviceNameRegex.MatchString(serviceName) || (!e.serviceFilterMap["*"] && !e.serviceFilterMap[serviceName]) || side == "server" {
 					f.Release()
 					continue
 				}
@@ -218,7 +236,7 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					"endpoint":     endpoint,
 					"protocol":     datatype.L7Protocol(f.L7Protocol).String(),
 				}
-				deepFlowRemoteRequestSummary.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				e.deepFlowRemoteRequestSummary.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
 				f.Release()
 			default:
 				log.Warningf("flow type(%T) unsupport", t)

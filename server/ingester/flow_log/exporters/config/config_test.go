@@ -38,6 +38,7 @@ func TestConfig(t *testing.T) {
 					{
 						Namespace:      "test",
 						ProtocolFilter: []string{"http", "https", "http2", "https2", "mysql", "redis", "kafka", "mqtt", "grpc", "protobuf_rpc"},
+						ServiceFilter:  []string{"*"},
 						QueueCount:     4,
 						QueueSize:      100000,
 						HTTPServerSettings: HTTPServerSettings{

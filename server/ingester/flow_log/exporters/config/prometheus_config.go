@@ -21,6 +21,9 @@ type PrometheusExporterConfig struct {
 	// ProtocolFilter defines L7 Protocols that could be export
 	ProtocolFilter []string `yaml:"protocol-filter"`
 
+	// ServiceFilter defines Service Name that could be export
+	ServiceFilter []string `yaml:"service-filter"`
+
 	QueueCount int `yaml:"queue-count"`
 	QueueSize  int `yaml:"queue-size"`
 
@@ -30,6 +33,7 @@ type PrometheusExporterConfig struct {
 // HTTPServerSettings defines settings for creating an prometheus exporter HTTP server.
 type HTTPServerSettings struct {
 	// Endpoint configures the listening address for the server.
+	// You need to config the Kubernetes service as well to expose the related port.
 	Endpoint string `yaml:"endpoint"`
 
 	// MaxRequestBodySize sets the maximum request body size in bytes

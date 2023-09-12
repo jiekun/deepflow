@@ -8,6 +8,7 @@ ingester:
       - namespace: test
         endpoint: 127.0.0.1:4317
         protocol-filter: [http, https, http2, https2, mysql, redis, kafka, mqtt, grpc, protobuf_rpc]
+        service-filter: ["*"]
         queue-count: 4
         queue-size: 100000
         export-datas: [ebpf-sys-span]
