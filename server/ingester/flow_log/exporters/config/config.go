@@ -39,6 +39,12 @@ func (ec *ExportersCfg) Validate() error {
 			return err
 		}
 	}
+
+	for i := range ec.PrometheusExporterCfg {
+		if err := ec.PrometheusExporterCfg[i].Validate(ec.OverridableCfg); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

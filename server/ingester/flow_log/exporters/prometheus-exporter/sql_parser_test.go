@@ -34,15 +34,27 @@ func TestGetStmtTypeAndTableName(t *testing.T) {
 			"DELETE",
 		},
 		{
-			"select",
+			"join",
 			"select * from my_table_a left join my_table_b on my_table_a.id = my_table_b.id;",
 			"my_table_a",
+			"SELECT",
+		},
+		{
+			"sharding table name",
+			"select * from sharding_table_01 left join my_table_b on my_table_a.id = my_table_b.id;",
+			"sharding_table",
+			"SELECT",
+		},
+		{
+			"sharding table name 2",
+			"select * from sharding_table_12347982 left join my_table_b on my_table_a.id = my_table_b.id;",
+			"sharding_table",
 			"SELECT",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tableName, operation := GetStmtTypeAndTableName(tt.sql)
+			operation, tableName := GetStmtTypeAndTableName(tt.sql)
 			if tableName != tt.tableName {
 				t.Errorf("GetStmtTypeAndTableName() got = %v, want %v", tableName, tt.tableName)
 			}

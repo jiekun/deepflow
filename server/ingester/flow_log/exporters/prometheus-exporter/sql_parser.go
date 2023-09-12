@@ -4,6 +4,11 @@ import (
 	"github.com/pingcap/tidb/parser"
 	"github.com/pingcap/tidb/parser/ast"
 	_ "github.com/pingcap/tidb/types/parser_driver"
+	"regexp"
+)
+
+var (
+	shardingRegex *regexp.Regexp
 )
 
 func GetStmtTypeAndTableName(sql string) (string, string) {
@@ -39,5 +44,9 @@ func GetStmtTypeAndTableName(sql string) (string, string) {
 			}
 		}
 	}
-	return command, tableName
+	return command, removeShardingInfo(tableName)
+}
+
+func removeShardingInfo(tableName string) string {
+	return shardingRegex.ReplaceAllString(tableName, "")
 }

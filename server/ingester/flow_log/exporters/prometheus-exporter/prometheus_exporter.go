@@ -17,11 +17,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -61,7 +59,8 @@ type Counter struct {
 }
 
 func init() {
-	serviceNameRegex, _ = regexp.Compile("^[a-zA-Z].+")
+	serviceNameRegex, _ = regexp.Compile(`^[a-zA-Z].+`)
+	shardingRegex, _ = regexp.Compile(`_\d+$`)
 }
 
 func (e *PrometheusExporter) GetCounter() interface{} {
@@ -108,10 +107,6 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 	serviceFilter := make(map[string]bool)
 	for i := range promExporterCfg.ServiceFilter {
 		serviceFilter[promExporterCfg.ServiceFilter[i]] = true
-	}
-
-	if len(promExporterCfg.ServiceFilter) == 0 {
-		serviceFilter["*"] = true
 	}
 
 	exporter := &PrometheusExporter{
@@ -239,7 +234,7 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 				e.deepFlowRemoteRequestSummary.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
 				f.Release()
 			default:
-				log.Warningf("flow type(%T) unsupport", t)
+				log.Debugf("flow type(%T) unsupport", t)
 				continue
 			}
 		}
@@ -259,43 +254,32 @@ func (e *PrometheusExporter) startMetricsServer() {
 // Endpoints for different protocol are different. getEndpoint try to compose a format:
 // Host/Path for RPC request and Host for middleware request.
 func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
-	var endpoint string
+	var summaryEndpoint, detailEndpoint string
 	switch datatype.L7Protocol(l7.L7Protocol) {
 	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE:
-		// e.g.: SELECT my_tab / UPDATE user_info_table
-		stmtType, tableName := GetStmtTypeAndTableName(l7.RequestResource)
-		endpoint = stmtType + " " + tableName
+		// e.g.: SELECT / SELECT user_tab
+		summaryEndpoint, detailEndpoint = GetMySQLEndpoint(l7.RequestResource)
 	case datatype.L7_PROTOCOL_REDIS:
-		// e.g.: GET
-		endpoint = l7.RequestType
+		// e.g.: read / command
+		summaryEndpoint, detailEndpoint = GetRedisEndpoint(l7.RequestType)
 	case datatype.L7_PROTOCOL_KAFKA:
 		// e.g.: TODO
-		endpoint = l7.RequestDomain
+		summaryEndpoint, detailEndpoint = GetKafkaEndpoint(l7.RequestDomain)
 	case datatype.L7_PROTOCOL_MQTT:
 		// e.g.: TODO
-		endpoint = l7.RequestDomain
+		summaryEndpoint, detailEndpoint = GetMQTTEndpoint(l7.RequestDomain)
 	case datatype.L7_PROTOCOL_GRPC:
-		// e.g.: /oteldemo.CheckoutService/PlaceOrder
-		endpoint = l7.Endpoint
+		// e.g.: service / service+command
+		summaryEndpoint, detailEndpoint = GetGRPCEndpoint(l7.Endpoint)
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
-		if strings.HasPrefix(strings.ToLower(l7.RequestResource), "http") {
-			endpoint = l7.RequestResource
-		} else {
-			endpoint = l7.RequestDomain + l7.RequestResource
-		}
-
-		// try to remove query params
-		log.Debugf("HTTP endpoint: %s", endpoint)
-		tmpEndpoint := endpoint
-		if !strings.HasPrefix(endpoint, "http") {
-			tmpEndpoint = "https://" + endpoint
-		}
-		if u, err := url.ParseRequestURI(tmpEndpoint); err == nil {
-			endpoint = u.Host + u.Path
-			log.Debugf("HTTP new endpoint: %s", endpoint)
-		}
+		// e.g.: host / host+path
+		summaryEndpoint, detailEndpoint = GetHTTPEndpoint(l7.RequestDomain, l7.RequestResource)
 	}
-	return endpoint
+
+	if e.cfg.Granularity == "detail" {
+		return detailEndpoint
+	}
+	return summaryEndpoint
 }
 
 func (e *PrometheusExporter) HandleSimpleCommand(op uint16, arg string) string {
