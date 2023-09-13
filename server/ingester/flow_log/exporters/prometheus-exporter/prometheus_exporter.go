@@ -129,6 +129,8 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		"side",
 		"status",
 		"service_name",
+		"namespace",
+		"cluster",
 		"endpoint",
 		"protocol",
 	})
@@ -189,9 +191,7 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 			case (*log_data.L7FlowLog):
 				f := flow.(*log_data.L7FlowLog)
 				tags0, tags1 := e.universalTagsManager.QueryUniversalTags(f)
-				var serviceName string
-				var side string
-				var status string
+				var serviceName, side, status, namespace, cluster string
 
 				endpoint := e.getEndpoint(f)
 				if endpoint == "" {
@@ -201,9 +201,13 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 				if exporter_common.IsClientSide(f.TapSide) {
 					side = "client"
 					serviceName = tags0.AutoService
+					namespace = tags0.PodNS
+					cluster = tags0.PodCluster
 				} else {
 					side = "server"
 					serviceName = tags1.AutoService
+					namespace = tags1.PodNS
+					cluster = tags1.PodCluster
 				}
 
 				// not export if:
@@ -228,6 +232,8 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					"side":         side,
 					"status":       status,
 					"service_name": serviceName,
+					"namespace":    namespace,
+					"cluster":      cluster,
 					"endpoint":     endpoint,
 					"protocol":     datatype.L7Protocol(f.L7Protocol).String(),
 				}
