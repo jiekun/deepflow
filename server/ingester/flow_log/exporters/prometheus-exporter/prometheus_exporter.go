@@ -125,6 +125,7 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		Name:                            "deepflow_remote_request_duration",
 		Namespace:                       promExporterCfg.Namespace,
 		ConstLabels:                     promExporterCfg.ConstLabels,
+		Buckets:                         []float64{.5, 1, 5, 10, 25, 75, 150, 500, 1000, 3000, 5000},
 		NativeHistogramBucketFactor:     1.2,
 		NativeHistogramMaxBucketNumber:  40,
 		NativeHistogramZeroThreshold:    0.1, // 0.1ms
