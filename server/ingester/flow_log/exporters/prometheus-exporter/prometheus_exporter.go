@@ -74,15 +74,15 @@ type PrometheusExporter struct {
 	cfg         *exporters_cfg.PrometheusExporterConfig
 	constLabels prometheus.Labels
 
-	index                        int
-	protocolFilterMap            map[datatype.L7Protocol]bool
-	serviceFilterMap             map[string]bool
-	dataQueues                   queue.FixedMultiQueue
-	queueCount                   int
-	counter                      *Counter
-	lastCounter                  Counter
-	running                      bool
-	deepFlowRemoteRequestSummary *prometheus.SummaryVec
+	index                     int
+	protocolFilterMap         map[datatype.L7Protocol]bool
+	serviceFilterMap          map[string]bool
+	dataQueues                queue.FixedMultiQueue
+	queueCount                int
+	counter                   *Counter
+	lastCounter               Counter
+	running                   bool
+	deepFlowRemoteRequestHist *prometheus.HistogramVec
 
 	universalTagsManager *utag.UniversalTagsManager
 	utils.Closable
@@ -121,10 +121,15 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		counter:              &Counter{},
 	}
 
-	exporter.deepFlowRemoteRequestSummary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
-		Name:        "deepflow_remote_request_duration",
-		Namespace:   promExporterCfg.Namespace,
-		ConstLabels: promExporterCfg.ConstLabels,
+	exporter.deepFlowRemoteRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:                            "deepflow_remote_request_duration",
+		Namespace:                       promExporterCfg.Namespace,
+		ConstLabels:                     promExporterCfg.ConstLabels,
+		NativeHistogramBucketFactor:     1.2,
+		NativeHistogramMaxBucketNumber:  40,
+		NativeHistogramZeroThreshold:    0.1, // 0.1ms
+		NativeHistogramMaxZeroThreshold: 100, // 100ms
+		NativeHistogramMinResetDuration: 30 * time.Minute,
 	}, []string{
 		"side",
 		"status",
@@ -134,7 +139,7 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		"endpoint",
 		"protocol",
 	})
-	prometheus.MustRegister(exporter.deepFlowRemoteRequestSummary)
+	prometheus.MustRegister(exporter.deepFlowRemoteRequestHist)
 
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, exporter)
 	common.RegisterCountableForIngester("exporter", exporter, stats.OptionStatTags{
@@ -187,9 +192,8 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 	for e.running {
 		n := e.dataQueues.Gets(queue.HashKey(queueID), flows)
 		for _, flow := range flows[:n] {
-			switch t := flow.(type) {
+			switch f := flow.(type) {
 			case (*log_data.L7FlowLog):
-				f := flow.(*log_data.L7FlowLog)
 				tags0, tags1 := e.universalTagsManager.QueryUniversalTags(f)
 				var serviceName, side, status, namespace, cluster string
 
@@ -237,10 +241,9 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					"endpoint":     endpoint,
 					"protocol":     datatype.L7Protocol(f.L7Protocol).String(),
 				}
-				e.deepFlowRemoteRequestSummary.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				e.deepFlowRemoteRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
 				f.Release()
 			default:
-				log.Debugf("flow type(%T) unsupport", t)
 				continue
 			}
 		}
@@ -281,7 +284,7 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 		// e.g.: host / host+path
 		summaryEndpoint, detailEndpoint = GetHTTPEndpoint(l7.RequestDomain, l7.RequestResource)
 	}
-
+	log.Debugf("getEndpoint, protocol: %s, summary: %s, detail: %s", l7.L7ProtocolStr, summaryEndpoint, detailEndpoint)
 	if e.cfg.Granularity == "detail" {
 		return detailEndpoint
 	}
