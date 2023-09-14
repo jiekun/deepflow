@@ -268,16 +268,16 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 	switch datatype.L7Protocol(l7.L7Protocol) {
 	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE:
 		// e.g.: SELECT / SELECT user_tab
-		summaryEndpoint, detailEndpoint = GetMySQLEndpoint(l7.RequestResource)
+		summaryEndpoint, detailEndpoint = GetMySQLEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestResource)
 	case datatype.L7_PROTOCOL_REDIS:
 		// e.g.: read / command
-		summaryEndpoint, detailEndpoint = GetRedisEndpoint(l7.RequestType)
+		summaryEndpoint, detailEndpoint = GetRedisEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestType)
 	case datatype.L7_PROTOCOL_KAFKA:
 		// e.g.: TODO
-		summaryEndpoint, detailEndpoint = GetKafkaEndpoint(l7.RequestDomain)
+		summaryEndpoint, detailEndpoint = GetKafkaEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestDomain)
 	case datatype.L7_PROTOCOL_MQTT:
 		// e.g.: TODO
-		summaryEndpoint, detailEndpoint = GetMQTTEndpoint(l7.RequestDomain)
+		summaryEndpoint, detailEndpoint = GetMQTTEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestDomain)
 	case datatype.L7_PROTOCOL_GRPC:
 		// e.g.: service / service+command
 		summaryEndpoint, detailEndpoint = GetGRPCEndpoint(l7.Endpoint)

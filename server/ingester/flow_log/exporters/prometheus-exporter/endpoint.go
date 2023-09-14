@@ -1,31 +1,48 @@
 package prometheus_exporter
 
 import (
+	"net"
 	"net/url"
 	"strings"
 )
 
-func GetMySQLEndpoint(sql string) (string, string) {
+func GetMySQLEndpoint(ipv4 net.IP, sql string) (string, string) {
+	targetIP := ""
+	if len(ipv4) > 0 {
+		targetIP = ipv4.String() + " "
+	}
 	// e.g.: SELECT / SELECT my_tab
 	stmtType, tableName := GetStmtTypeAndTableName(sql)
-	return stmtType, stmtType + " " + tableName
+	return targetIP + stmtType, targetIP + stmtType + " " + tableName
 }
 
-func GetRedisEndpoint(cmd string) (string, string) {
-	if readCommandMap[strings.ToLower(cmd)] {
-		return "read", cmd
-	} else if writeCommandMap[strings.ToLower(cmd)] {
-		return "write", cmd
+func GetRedisEndpoint(ipv4 net.IP, cmd string) (string, string) {
+	targetIP := ""
+	if len(ipv4) > 0 {
+		targetIP = ipv4.String() + " "
 	}
-	return "unknown", cmd
+	if readCommandMap[strings.ToLower(cmd)] {
+		return targetIP + "read", cmd
+	} else if writeCommandMap[strings.ToLower(cmd)] {
+		return targetIP + "write", cmd
+	}
+	return targetIP + "unknown", cmd
 }
 
-func GetKafkaEndpoint(requestDomain string) (string, string) {
-	return requestDomain, requestDomain
+func GetKafkaEndpoint(ipv4 net.IP, requestDomain string) (string, string) {
+	targetIP := ""
+	if len(ipv4) > 0 {
+		targetIP = ipv4.String() + " "
+	}
+	return targetIP + requestDomain, targetIP + requestDomain
 }
 
-func GetMQTTEndpoint(requestDomain string) (string, string) {
-	return requestDomain, requestDomain
+func GetMQTTEndpoint(ipv4 net.IP, requestDomain string) (string, string) {
+	targetIP := ""
+	if len(ipv4) > 0 {
+		targetIP = ipv4.String() + " "
+	}
+	return targetIP + requestDomain, targetIP + requestDomain
 }
 
 func GetGRPCEndpoint(rpcPath string) (string, string) {
