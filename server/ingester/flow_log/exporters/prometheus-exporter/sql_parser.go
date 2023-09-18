@@ -12,7 +12,7 @@ var (
 )
 
 func GetStmtTypeAndTableName(sql string) (string, string) {
-	command, tableName := "unknown", "unknown"
+	command, tableName := "", "unknown"
 
 	p := parser.New()
 	stmt, err := p.ParseOneStmt(sql, "", "")
@@ -34,6 +34,8 @@ func GetStmtTypeAndTableName(sql string) (string, string) {
 	case *ast.DeleteStmt:
 		from = st.TableRefs
 		command = "DELETE"
+	default:
+		return command, tableName
 	}
 	if from != nil && from.TableRefs != nil {
 		ts, ok := from.TableRefs.Left.(*ast.TableSource)

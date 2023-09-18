@@ -41,6 +41,7 @@ var (
 		"redis":        datatype.L7_PROTOCOL_REDIS,
 		"kafka":        datatype.L7_PROTOCOL_KAFKA,
 		"mqtt":         datatype.L7_PROTOCOL_MQTT,
+		"mongodb":      datatype.L7_PROTOCOL_MONGODB,
 	}
 )
 
@@ -284,6 +285,8 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
 		// e.g.: host / host+path
 		summaryEndpoint, detailEndpoint = GetHTTPEndpoint(l7.RequestDomain, l7.RequestResource)
+	case datatype.L7_PROTOCOL_MONGODB:
+		summaryEndpoint, detailEndpoint = GetMongoEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestResource)
 	}
 	log.Debugf("getEndpoint, protocol: %s, summary: %s, detail: %s", l7.L7ProtocolStr, summaryEndpoint, detailEndpoint)
 	if e.cfg.Granularity == "detail" {

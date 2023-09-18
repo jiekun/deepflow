@@ -13,6 +13,9 @@ func GetMySQLEndpoint(ipv4 net.IP, sql string) (string, string) {
 	}
 	// e.g.: SELECT / SELECT my_tab
 	stmtType, tableName := GetStmtTypeAndTableName(sql)
+
+	// Unknown statement will be ignored in metrics.
+	// For example, BEGIN / COMMIT.
 	return targetIP + stmtType, targetIP + stmtType + " " + tableName
 }
 
@@ -76,4 +79,15 @@ func GetHTTPEndpoint(requestDomain, requestResource string) (string, string) {
 		log.Debugf("HTTP new endpoint: %s", detailEndpoint)
 	}
 	return summaryEndpoint, detailEndpoint
+}
+
+func GetMongoEndpoint(ipv4 net.IP, requestResource string) (string, string) {
+	targetIP := ""
+	if len(ipv4) > 0 {
+		targetIP = ipv4.String() + " "
+	}
+	// todo requestResource is too long and hard to parse.
+	// Provide targetIP as basic information. And look for a proper endpoint in future release.
+	return targetIP, targetIP
+
 }
