@@ -75,15 +75,19 @@ type PrometheusExporter struct {
 	cfg         *exporters_cfg.PrometheusExporterConfig
 	constLabels prometheus.Labels
 
-	index                     int
-	protocolFilterMap         map[datatype.L7Protocol]bool
-	serviceFilterMap          map[string]bool
-	dataQueues                queue.FixedMultiQueue
-	queueCount                int
-	counter                   *Counter
-	lastCounter               Counter
-	running                   bool
-	deepFlowRemoteRequestHist *prometheus.HistogramVec
+	index             int
+	protocolFilterMap map[datatype.L7Protocol]bool
+	serviceFilterMap  map[string]bool
+	dataQueues        queue.FixedMultiQueue
+	queueCount        int
+	counter           *Counter
+	lastCounter       Counter
+	running           bool
+
+	deepFlowRemoteRequestHist   *prometheus.HistogramVec
+	deepFlowDatabaseRequestHist *prometheus.HistogramVec
+	deepFlowCacheRequestHist    *prometheus.HistogramVec
+	deepFlowMQRequestHist       *prometheus.HistogramVec
 
 	universalTagsManager *utag.UniversalTagsManager
 	utils.Closable
@@ -126,10 +130,10 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		Name:                            "deepflow_remote_request_duration",
 		Namespace:                       promExporterCfg.Namespace,
 		ConstLabels:                     promExporterCfg.ConstLabels,
-		Buckets:                         []float64{.5, 1, 5, 10, 25, 75, 150, 500, 1000, 3000, 5000},
+		Buckets:                         []float64{3, 7, 15, 30, 60, 120, 250, 500, 1000, 2000, 5000},
 		NativeHistogramBucketFactor:     1.2,
 		NativeHistogramMaxBucketNumber:  40,
-		NativeHistogramZeroThreshold:    0.1, // 0.1ms
+		NativeHistogramZeroThreshold:    1,   // 3ms
 		NativeHistogramMaxZeroThreshold: 100, // 100ms
 		NativeHistogramMinResetDuration: 30 * time.Minute,
 	}, []string{
@@ -141,6 +145,67 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		"endpoint",
 		"protocol",
 	})
+
+	exporter.deepFlowDatabaseRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:                            "deepflow_database_request_duration",
+		Namespace:                       promExporterCfg.Namespace,
+		ConstLabels:                     promExporterCfg.ConstLabels,
+		Buckets:                         []float64{3, 7, 15, 30, 60, 120, 250, 500, 1000, 2000, 5000},
+		NativeHistogramBucketFactor:     1.2,
+		NativeHistogramMaxBucketNumber:  40,
+		NativeHistogramZeroThreshold:    1,   // 1ms
+		NativeHistogramMaxZeroThreshold: 100, // 100ms
+		NativeHistogramMinResetDuration: 30 * time.Minute,
+	}, []string{
+		"side",
+		"status",
+		"service_name",
+		"namespace",
+		"cluster",
+		"endpoint",
+		"protocol",
+	})
+
+	exporter.deepFlowCacheRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:                            "deepflow_cache_request_duration",
+		Namespace:                       promExporterCfg.Namespace,
+		ConstLabels:                     promExporterCfg.ConstLabels,
+		Buckets:                         []float64{.2, 0.5, 1, 2, 5, 10, 20, 40, 80, 160, 400, 1000},
+		NativeHistogramBucketFactor:     1.2,
+		NativeHistogramMaxBucketNumber:  40,
+		NativeHistogramZeroThreshold:    0.1, // 0.1ms
+		NativeHistogramMaxZeroThreshold: 10,  // 100ms
+		NativeHistogramMinResetDuration: 30 * time.Minute,
+	}, []string{
+		"side",
+		"status",
+		"service_name",
+		"namespace",
+		"cluster",
+		"endpoint",
+		"protocol",
+	})
+
+	exporter.deepFlowMQRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:                            "deepflow_mq_request_duration",
+		Namespace:                       promExporterCfg.Namespace,
+		ConstLabels:                     promExporterCfg.ConstLabels,
+		Buckets:                         []float64{5, 10, 20, 50, 120, 250, 500, 1000, 1500, 2500, 5000},
+		NativeHistogramBucketFactor:     1.2,
+		NativeHistogramMaxBucketNumber:  40,
+		NativeHistogramZeroThreshold:    5,   // 0.1ms
+		NativeHistogramMaxZeroThreshold: 100, // 100ms
+		NativeHistogramMinResetDuration: 30 * time.Minute,
+	}, []string{
+		"side",
+		"status",
+		"service_name",
+		"namespace",
+		"cluster",
+		"endpoint",
+		"protocol",
+	})
+
 	prometheus.MustRegister(exporter.deepFlowRemoteRequestHist)
 
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, exporter)
@@ -243,7 +308,16 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					"endpoint":     endpoint,
 					"protocol":     datatype.L7Protocol(f.L7Protocol).String(),
 				}
-				e.deepFlowRemoteRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				switch datatype.L7Protocol(f.L7Protocol) {
+				case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS, datatype.L7_PROTOCOL_GRPC:
+					e.deepFlowRemoteRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE, datatype.L7_PROTOCOL_MONGODB:
+					e.deepFlowDatabaseRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				case datatype.L7_PROTOCOL_KAFKA, datatype.L7_PROTOCOL_MQTT:
+					e.deepFlowMQRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				case datatype.L7_PROTOCOL_REDIS:
+					e.deepFlowCacheRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+				}
 				f.Release()
 			default:
 				continue
