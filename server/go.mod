@@ -35,7 +35,7 @@ require (
 	github.com/cornelk/hashmap v1.0.8
 	github.com/deckarep/golang-set v1.8.0
 	github.com/deckarep/golang-set/v2 v2.1.0
-	github.com/deepflowio/deepflow/message v0.0.0-20230906040243-dcfa4360cf64
+	github.com/deepflowio/deepflow/message v0.0.0-20230915085230-6b0e68f463f8
 	github.com/deepflowio/deepflow/server/controller/cloud/kubernetes_gather/expand v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/cloud/platform v0.0.0-00010101000000-000000000000
 	github.com/deepflowio/deepflow/server/controller/db/mysql/migrator v0.0.0-00010101000000-000000000000
@@ -56,7 +56,7 @@ require (
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/olivere/elastic v6.2.37+incompatible
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c // indirect
+	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
 	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
 	github.com/pebbe/zmq4 v1.2.9
 	github.com/pkg/errors v0.9.1
@@ -249,7 +249,7 @@ require (
 	golang.org/x/time v0.0.0-20220224211638-0e9765cccd65 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc // indirect
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1

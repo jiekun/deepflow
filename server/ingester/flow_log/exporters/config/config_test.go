@@ -1,10 +1,11 @@
 package config
 
 import (
-	"google.golang.org/protobuf/proto"
 	"io/ioutil"
 	"reflect"
 	"testing"
+
+	"github.com/gogo/protobuf/proto"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -34,6 +35,26 @@ func TestConfig(t *testing.T) {
 					ExportOnlyWithTraceID:       nil,
 				},
 				Enabled: false,
+
+				OtlpExporterCfgs: []OtlpExporterConfig{
+					{
+						Enabled:          true,
+						Addr:             "127.0.0.1:4317",
+						QueueCount:       4,
+						QueueSize:        100000,
+						ExportBatchCount: 32,
+						GrpcHeaders: map[string]string{
+							"key1": "value1",
+							"key2": "value2",
+						},
+						OverridableCfg: OverridableCfg{
+							ExportDatas:                 []string{"ebpf-sys-span"},
+							ExportDataTypes:             []string{"tracing_info", "network_layer", "flow_info", "transport_layer", "application_layer", "metrics"},
+							ExportCustomK8sLabelsRegexp: "",
+							ExportOnlyWithTraceID:       proto.Bool(true),
+						},
+					},
+				},
 				PrometheusExporterCfg: []PrometheusExporterConfig{
 					{
 						Namespace:      "test",

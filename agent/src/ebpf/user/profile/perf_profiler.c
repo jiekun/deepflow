@@ -208,7 +208,10 @@ static void set_msg_kvp(stack_trace_msg_kv_t * kvp,
 static void set_stack_trace_msg(stack_trace_msg_t * msg,
 				struct stack_trace_key_t *v,
 				bool matched,
-				u64 stime, u64 ns_id, const char *process_name)
+				u64 stime,
+				u64 ns_id,
+				const char *process_name,
+				const char *container_id)
 {
 	msg->pid = v->tgid;
 	msg->tid = v->pid;
@@ -218,6 +221,10 @@ static void set_stack_trace_msg(stack_trace_msg_t * msg,
 	strcpy_s_inline(msg->comm, sizeof(msg->comm), v->comm, strlen(v->comm));
 	msg->stime = stime;
 	msg->netns_id = ns_id;
+	if (container_id != NULL) {
+		strcpy_s_inline(msg->container_id, sizeof(msg->container_id),
+				container_id, strlen(container_id));
+	}
 
 	if (stime > 0) {
 		/*
@@ -479,8 +486,9 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 		stack_trace_msg_kv_t kv;
 		char name[TASK_COMM_LEN];
 		u64 stime, netns_id;
+		void *info_p = NULL;
 		get_process_info_by_pid(v->tgid, &stime, &netns_id,
-					(char *)name);
+					(char *)name, &info_p);
 		char *process_name = NULL;
 		bool matched = false;
 
@@ -523,7 +531,7 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 
 		char *trace_str =
 		    resolve_and_gen_stack_trace_str(t, v, stack_map_name,
-						    stack_str_hash, matched);
+						    stack_str_hash, matched, info_p);
 		if (trace_str) {
 			/*
 			 * append process/thread name to stack string
@@ -537,8 +545,12 @@ static void aggregate_stack_traces(struct bpf_tracer *t,
 				continue;
 			}
 
+			memset(msg, 0, len);
+			struct symbolizer_proc_info *__p = info_p;
 			set_stack_trace_msg(msg, v, matched, stime, netns_id,
-					    process_name);
+					    process_name,
+					    __p ? __p->container_id : NULL);
+
 			snprintf((char *)&msg->data[0], str_len, "%s;%s",
 				 v->comm, trace_str);
 			msg->data_len = str_len - 1;

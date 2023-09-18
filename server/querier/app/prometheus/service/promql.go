@@ -75,11 +75,13 @@ const _SUCCESS = "success"
 type prometheusExecutor struct {
 	extraLabelCache *lru.Cache[string, string]
 	ticker          *time.Ticker
+	lookbackDelta   time.Duration
 }
 
-func NewPrometheusExecutor() *prometheusExecutor {
+func NewPrometheusExecutor(delta time.Duration) *prometheusExecutor {
 	executor := &prometheusExecutor{
 		extraLabelCache: lru.NewCache[string, string](config.Cfg.Prometheus.ExternalTagCacheSize),
+		lookbackDelta:   delta,
 	}
 	go executor.triggerLoadExternalTag()
 	return executor
@@ -188,6 +190,22 @@ func (p *prometheusExecutor) promQueryRangeExecute(ctx context.Context, args *mo
 	reader.getExternalTagFromCache = p.convertExternalTagToQuerierAllowTag
 	reader.addExternalTagToCache = p.addExtraLabelConvertion
 	queriable := &RemoteReadQuerierable{Args: args, Ctx: ctx, MatchMetricNameFunc: p.matchMetricName, reader: reader}
+	// in range query, it will scan data from [startTime-lookbackDelta] to endTime
+	// then drop points if timestamp of first point is greater than startTime
+	// so, when start%step > lookbackdelta, points may lost during scan
+	// should fix up time query range for large query steps
+	if start.Local().Unix()%int64(step.Seconds()) > int64(p.lookbackDelta.Seconds()) {
+		start = time.Unix(start.Local().Unix()-start.Local().Unix()%int64(step.Seconds()), 0)
+	}
+	if end.Local().Unix()%int64(step.Seconds()) > int64(p.lookbackDelta.Seconds()) {
+		end = time.Unix(end.Local().Unix()-end.Local().Unix()%int64(step.Seconds())+int64(step.Seconds()), 0)
+	}
+	if int(step.Seconds())%86400 == 0 {
+		year_start, month_start, day_start := start.Date()
+		year_end, month_end, day_end := end.Date()
+		start = time.Date(year_start, month_start, day_start, 0, 0, 0, 0, start.Location())
+		end = time.Date(year_end, month_end, day_end, 0, 0, 0, 0, end.Location())
+	}
 	qry, err := engine.NewRangeQuery(queriable, nil, args.Promql, start, end, step)
 	if qry == nil || err != nil {
 		log.Error(err)
@@ -357,7 +375,7 @@ func (p *prometheusExecutor) parsePromQL(promQL string) (res *model.PromQueryWra
 		res.Description = err.Error()
 		return res, err
 	}
-	var db, tableName, metric, aggFunc string
+	var dbs, tables, metrics, aggFuncs []string
 	parser.Inspect(expr, func(node parser.Node, path []parser.Node) error {
 		if vs, ok := node.(*parser.VectorSelector); ok {
 			pbMatchers := make([]*prompb.LabelMatcher, 0, 1)
@@ -369,22 +387,48 @@ func (p *prometheusExecutor) parsePromQL(promQL string) (res *model.PromQueryWra
 						Name:  m.Name,
 						Value: m.Value,
 					})
-					_, _, db, tableName, _, _, metric, err = parseMetric(pbMatchers)
+					_, _, db, tableName, _, _, metric, err := parseMetric(pbMatchers)
+					if err != nil {
+						return err
+					}
+					dbs = appendWithoutDuplicated(&dbs, db)
+					tables = appendWithoutDuplicated(&tables, tableName)
+					metrics = appendWithoutDuplicated(&metrics, metric)
 					break
 				}
 			}
 		}
-		return nil
+		// every node may have multiple aggregation path
+		for _, p := range path {
+			switch e := p.(type) {
+			case *parser.AggregateExpr:
+				aggFuncs = appendWithoutDuplicated(&aggFuncs, e.Op.String())
+			case *parser.Call:
+				aggFuncs = appendWithoutDuplicated(&aggFuncs, e.Func.Name)
+			}
+		}
+		return err
 	})
-	switch e := expr.(type) {
-	case *parser.AggregateExpr:
-		aggFunc = e.Op.String()
-	case *parser.Call:
-		aggFunc = e.Func.Name
-	}
 	res.OptStatus = _SUCCESS
-	res.Data = []map[string]interface{}{{"db": db, "table": tableName, "metric": metric, "aggFunc": aggFunc}}
-	return res, nil
+	res.Data = []map[string]interface{}{
+		{
+			"db":      strings.Join(dbs, ","),
+			"table":   strings.Join(tables, ","),
+			"metric":  strings.Join(metrics, ","),
+			"aggFunc": strings.Join(aggFuncs, ","),
+		},
+	}
+	return res, err
+}
+
+func appendWithoutDuplicated(array *[]string, str string) []string {
+	for _, v := range *array {
+		if v == str {
+			return *array
+		}
+	}
+	*array = append(*array, str)
+	return *array
 }
 
 func (p *prometheusExecutor) addExtraFilters(promQL string, filters map[string]string) (*model.PromQueryWrapper, error) {
