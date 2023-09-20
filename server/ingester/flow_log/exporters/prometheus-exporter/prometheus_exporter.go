@@ -207,6 +207,9 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 	})
 
 	prometheus.MustRegister(exporter.deepFlowRemoteRequestHist)
+	prometheus.MustRegister(exporter.deepFlowDatabaseRequestHist)
+	prometheus.MustRegister(exporter.deepFlowCacheRequestHist)
+	prometheus.MustRegister(exporter.deepFlowMQRequestHist)
 
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, exporter)
 	common.RegisterCountableForIngester("exporter", exporter, stats.OptionStatTags{
@@ -240,7 +243,7 @@ func (e *PrometheusExporter) Put(items ...interface{}) {
 
 func (e *PrometheusExporter) IsExportData(l *log_data.L7FlowLog) bool {
 	// always not export data from OTel
-	if l.SignalSource != uint16(datatype.SIGNAL_SOURCE_EBPF) {
+	if l.SignalSource != uint16(datatype.SIGNAL_SOURCE_PACKET) {
 		e.counter.DropCounter++
 		return false
 	}
@@ -343,24 +346,24 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 	switch datatype.L7Protocol(l7.L7Protocol) {
 	case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE:
 		// e.g.: SELECT / SELECT user_tab
-		summaryEndpoint, detailEndpoint = GetMySQLEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestResource)
+		summaryEndpoint, _ = GetMySQLEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestResource)
 	case datatype.L7_PROTOCOL_REDIS:
 		// e.g.: read / command
-		summaryEndpoint, detailEndpoint = GetRedisEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestType)
+		summaryEndpoint, _ = GetRedisEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestType)
 	case datatype.L7_PROTOCOL_KAFKA:
 		// e.g.: TODO
-		summaryEndpoint, detailEndpoint = GetKafkaEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestDomain)
+		summaryEndpoint, _ = GetKafkaEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestDomain)
 	case datatype.L7_PROTOCOL_MQTT:
 		// e.g.: TODO
-		summaryEndpoint, detailEndpoint = GetMQTTEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestDomain)
+		summaryEndpoint, _ = GetMQTTEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestDomain)
 	case datatype.L7_PROTOCOL_GRPC:
 		// e.g.: service / service+command
-		summaryEndpoint, detailEndpoint = GetGRPCEndpoint(l7.Endpoint)
+		summaryEndpoint, _ = GetGRPCEndpoint(l7.Endpoint)
 	case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS:
 		// e.g.: host / host+path
-		summaryEndpoint, detailEndpoint = GetHTTPEndpoint(l7.RequestDomain, l7.RequestResource)
+		summaryEndpoint, _ = GetHTTPEndpoint(l7.RequestDomain, l7.RequestResource)
 	case datatype.L7_PROTOCOL_MONGODB:
-		summaryEndpoint, detailEndpoint = GetMongoEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestResource)
+		summaryEndpoint, _ = GetMongoEndpoint(utils.IpFromUint32(l7.IP41), l7.RequestResource)
 	}
 	log.Debugf("getEndpoint, protocol: %s, summary: %s, detail: %s", l7.L7ProtocolStr, summaryEndpoint, detailEndpoint)
 	if e.cfg.Granularity == "detail" {

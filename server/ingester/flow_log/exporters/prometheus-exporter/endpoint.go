@@ -9,43 +9,48 @@ import (
 func GetMySQLEndpoint(ipv4 net.IP, sql string) (string, string) {
 	targetIP := ""
 	if len(ipv4) > 0 {
-		targetIP = ipv4.String() + " "
+		targetIP = ipv4.String()
 	}
-	// e.g.: SELECT / SELECT my_tab
+	// e.g.: SELECT / my_tab
 	stmtType, tableName := GetStmtTypeAndTableName(sql)
 
+	// It has to be SELECT / INSERT / UPDATE / DELETE, and an operation to table or sub_query.
 	// Unknown statement will be ignored in metrics.
 	// For example, BEGIN / COMMIT.
-	return targetIP + stmtType, targetIP + stmtType + " " + tableName
+	if stmtType == "" || tableName == "" {
+		return "", ""
+	}
+
+	return targetIP, targetIP + " " + stmtType + " " + tableName
 }
 
 func GetRedisEndpoint(ipv4 net.IP, cmd string) (string, string) {
 	targetIP := ""
 	if len(ipv4) > 0 {
-		targetIP = ipv4.String() + " "
+		targetIP = ipv4.String()
 	}
 	if readCommandMap[strings.ToLower(cmd)] {
-		return targetIP + "read", cmd
+		return targetIP, cmd
 	} else if writeCommandMap[strings.ToLower(cmd)] {
-		return targetIP + "write", cmd
+		return targetIP, cmd
 	}
-	return targetIP + "unknown", cmd
+	return targetIP, cmd
 }
 
 func GetKafkaEndpoint(ipv4 net.IP, requestDomain string) (string, string) {
 	targetIP := ""
 	if len(ipv4) > 0 {
-		targetIP = ipv4.String() + " "
+		targetIP = ipv4.String()
 	}
-	return targetIP + requestDomain, targetIP + requestDomain
+	return targetIP, targetIP + " " + requestDomain
 }
 
 func GetMQTTEndpoint(ipv4 net.IP, requestDomain string) (string, string) {
 	targetIP := ""
 	if len(ipv4) > 0 {
-		targetIP = ipv4.String() + " "
+		targetIP = ipv4.String()
 	}
-	return targetIP + requestDomain, targetIP + requestDomain
+	return targetIP, targetIP + requestDomain
 }
 
 func GetGRPCEndpoint(rpcPath string) (string, string) {

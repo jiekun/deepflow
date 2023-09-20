@@ -51,6 +51,24 @@ func TestGetStmtTypeAndTableName(t *testing.T) {
 			"sharding_table",
 			"SELECT",
 		},
+		{
+			"test complex sql",
+			"select a, b from (select a, b, c from my_table_a)",
+			"sub_query",
+			"SELECT",
+		},
+		{
+			"test meaning less sql",
+			"select 1",
+			"",
+			"SELECT",
+		},
+		{
+			"test meaning less sql 2",
+			"begin;",
+			"",
+			"",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

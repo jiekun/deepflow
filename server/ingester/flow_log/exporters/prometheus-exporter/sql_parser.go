@@ -12,7 +12,7 @@ var (
 )
 
 func GetStmtTypeAndTableName(sql string) (string, string) {
-	command, tableName := "", "unknown"
+	command, tableName := "", ""
 
 	p := parser.New()
 	stmt, err := p.ParseOneStmt(sql, "", "")
@@ -40,9 +40,11 @@ func GetStmtTypeAndTableName(sql string) (string, string) {
 	if from != nil && from.TableRefs != nil {
 		ts, ok := from.TableRefs.Left.(*ast.TableSource)
 		if ok {
-			tn, ok := ts.Source.(*ast.TableName)
-			if ok {
+			switch tn := ts.Source.(type) {
+			case *ast.TableName:
 				tableName = tn.Name.String()
+			case *ast.SelectStmt:
+				tableName = "sub_query"
 			}
 		}
 	}
