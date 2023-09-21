@@ -33,8 +33,10 @@ func GetRedisEndpoint(ipv4 net.IP, cmd string) (string, string) {
 		return targetIP, cmd
 	} else if writeCommandMap[strings.ToLower(cmd)] {
 		return targetIP, cmd
+	} else {
+		// Not valid
+		return "", ""
 	}
-	return targetIP, cmd
 }
 
 func GetKafkaEndpoint(ipv4 net.IP, requestDomain string) (string, string) {

@@ -137,13 +137,12 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		NativeHistogramMaxZeroThreshold: 100, // 100ms
 		NativeHistogramMinResetDuration: 30 * time.Minute,
 	}, []string{
-		"side",
-		"status",
+		"request_status",
 		"service_name",
-		"namespace",
-		"cluster",
-		"endpoint",
-		"protocol",
+		"service_namespace",
+		"service_cluster",
+		"request_endpoint",
+		"request_protocol",
 	})
 
 	exporter.deepFlowDatabaseRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -157,13 +156,12 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		NativeHistogramMaxZeroThreshold: 100, // 100ms
 		NativeHistogramMinResetDuration: 30 * time.Minute,
 	}, []string{
-		"side",
-		"status",
+		"request_status",
 		"service_name",
-		"namespace",
-		"cluster",
-		"endpoint",
-		"protocol",
+		"service_namespace",
+		"service_cluster",
+		"request_endpoint",
+		"request_protocol",
 	})
 
 	exporter.deepFlowCacheRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -177,13 +175,12 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		NativeHistogramMaxZeroThreshold: 10,  // 100ms
 		NativeHistogramMinResetDuration: 30 * time.Minute,
 	}, []string{
-		"side",
-		"status",
+		"request_status",
 		"service_name",
-		"namespace",
-		"cluster",
-		"endpoint",
-		"protocol",
+		"service_namespace",
+		"service_cluster",
+		"request_endpoint",
+		"request_protocol",
 	})
 
 	exporter.deepFlowMQRequestHist = prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -197,13 +194,12 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 		NativeHistogramMaxZeroThreshold: 100, // 100ms
 		NativeHistogramMinResetDuration: 30 * time.Minute,
 	}, []string{
-		"side",
-		"status",
+		"request_status",
 		"service_name",
-		"namespace",
-		"cluster",
-		"endpoint",
-		"protocol",
+		"service_namespace",
+		"service_cluster",
+		"request_endpoint",
+		"request_protocol",
 	})
 
 	prometheus.MustRegister(exporter.deepFlowRemoteRequestHist)
@@ -303,13 +299,12 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 				}
 
 				label := prometheus.Labels{
-					"side":         side,
-					"status":       status,
-					"service_name": serviceName,
-					"namespace":    namespace,
-					"cluster":      cluster,
-					"endpoint":     endpoint,
-					"protocol":     datatype.L7Protocol(f.L7Protocol).String(),
+					"request_status":    status,
+					"service_name":      serviceName,
+					"service_namespace": namespace,
+					"service_cluster":   cluster,
+					"request_endpoint":  endpoint,
+					"request_protocol":  datatype.L7Protocol(f.L7Protocol).String(),
 				}
 				switch datatype.L7Protocol(f.L7Protocol) {
 				case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS, datatype.L7_PROTOCOL_GRPC:
