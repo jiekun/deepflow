@@ -16,6 +16,7 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/utils"
 	"github.com/grafana/loki-client-go/loki"
 	"github.com/grafana/loki-client-go/pkg/backoff"
+	"github.com/grafana/loki-client-go/pkg/labelutil"
 	"github.com/grafana/loki-client-go/pkg/urlutil"
 	"github.com/op/go-logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -246,6 +247,9 @@ func (e *PrometheusExporter) buildLokiConfig() (*loki.Config, error) {
 			MaxBackoff: time.Second * time.Duration(e.cfg.MaxBackoffSecond),
 			MaxRetries: int(e.cfg.MaxRetries),
 		},
+		ExternalLabels: labelutil.LabelSet{
+			LabelSet: map[model.LabelName]model.LabelValue{"log_by": "deepflow_prom_exporter"},
+		},
 	}
 	var url urlutil.URLValue
 	err := url.Set(e.cfg.LokiURL)
@@ -457,7 +461,6 @@ func (e *PrometheusExporter) ReportEventLog(f *log_data.L7FlowLog, serviceName, 
 	}
 
 	labels := model.LabelSet{
-		"request_status":    model.LabelValue(level),
 		"service_name":      model.LabelValue(serviceName),
 		"service_namespace": model.LabelValue(namespace),
 		"service_cluster":   model.LabelValue(cluster),
@@ -465,19 +468,22 @@ func (e *PrometheusExporter) ReportEventLog(f *log_data.L7FlowLog, serviceName, 
 		"request_protocol":  model.LabelValue(datatype.L7Protocol(f.L7Protocol).String()),
 	}
 	t := time.UnixMicro(f.EndTime().Microseconds())
-	defaultLogHeaderFormat := `time="%s",log_level="%s",`
+	defaultLogHeaderFormat := `time="%s",log_level="%s",duration="%.2f",`
 
-	logHeader := fmt.Sprintf(defaultLogHeaderFormat, t, level)
+	logHeader := fmt.Sprintf(defaultLogHeaderFormat, t, level, latency)
 	logBody := ""
 	switch datatype.L7Protocol(f.L7Protocol) {
 	case datatype.L7_PROTOCOL_MYSQL:
 		logBody = f.RequestResource
 	case datatype.L7_PROTOCOL_REDIS:
-		logBody = f.RequestType
+		logBody = f.RequestResource
 	}
 
 	if e.lokiClient != nil {
-		e.lokiClient.Handle(labels, t, logHeader+logBody)
+		err := e.lokiClient.Handle(labels, t, logHeader+logBody)
+		if err != nil {
+			log.Debugf("loki client handle err: %v", err)
+		}
 	}
 	return
 }
