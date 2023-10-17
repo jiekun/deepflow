@@ -57,11 +57,20 @@ func TestConfig(t *testing.T) {
 				},
 				PrometheusExporterCfg: []PrometheusExporterConfig{
 					{
-						Namespace:      "test",
-						ProtocolFilter: []string{"http", "https", "http2", "https2", "mysql", "redis", "kafka", "mqtt", "grpc", "protobuf_rpc"},
-						ServiceFilter:  []string{"*"},
-						QueueCount:     4,
-						QueueSize:      100000,
+						Namespace:            "test",
+						ProtocolFilter:       []string{"http", "https", "http2", "https2", "mysql", "redis", "kafka", "mqtt", "grpc", "protobuf_rpc"},
+						ServiceFilter:        []string{"*"},
+						QueueCount:           4,
+						QueueSize:            100000,
+						LokiURL:              "127.0.0.1:1234",
+						LokiTenantID:         "test-tenant-id",
+						MaxMessageWaitSecond: 2,
+						MaxMessageBytes:      1024 * 1024,
+						TimeoutSecond:        5,
+						MinBackoffSecond:     1,
+						MaxBackoffSecond:     60,
+						MaxRetries:           3,
+
 						HTTPServerSettings: HTTPServerSettings{
 							Endpoint: "127.0.0.1:4317",
 						},

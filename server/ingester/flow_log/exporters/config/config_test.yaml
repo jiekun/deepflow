@@ -15,6 +15,14 @@ ingester:
         export-data-types: [ tracing_info,network_layer,flow_info,transport_layer,application_layer,metrics ]
         export-custom-k8s-labels-regexp:
         export-only-with-traceid: true
+        loki-url: 127.0.0.1:1234
+        loki-tenant-id: test-tenant-id
+        max-message-wait-second: 2
+        max-message-bytes: 1048576
+        timeout-second: 5
+        min-backoff-second: 1
+        max-backoff-second: 60
+        max-retries: 3
     otlp-exporters:
     - enabled: true
       addr: 127.0.0.1:4317

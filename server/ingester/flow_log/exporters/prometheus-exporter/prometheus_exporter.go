@@ -1,6 +1,7 @@
 package prometheus_exporter
 
 import (
+	"errors"
 	"fmt"
 	"github.com/deepflowio/deepflow/server/ingester/common"
 	exporter_common "github.com/deepflowio/deepflow/server/ingester/flow_log/exporters/common"
@@ -13,9 +14,14 @@ import (
 	"github.com/deepflowio/deepflow/server/libs/queue"
 	"github.com/deepflowio/deepflow/server/libs/stats"
 	"github.com/deepflowio/deepflow/server/libs/utils"
+	"github.com/grafana/loki-client-go/loki"
+	"github.com/grafana/loki-client-go/pkg/backoff"
+	"github.com/grafana/loki-client-go/pkg/urlutil"
 	"github.com/op/go-logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/model"
+	"math/rand"
 	"net/http"
 	"os"
 	"regexp"
@@ -88,6 +94,8 @@ type PrometheusExporter struct {
 	deepFlowDatabaseRequestHist *prometheus.HistogramVec
 	deepFlowCacheRequestHist    *prometheus.HistogramVec
 	deepFlowMQRequestHist       *prometheus.HistogramVec
+
+	lokiClient *loki.Client
 
 	universalTagsManager *utag.UniversalTagsManager
 	utils.Closable
@@ -210,8 +218,42 @@ func NewPrometheusExporter(index int, config *exporters_cfg.ExportersCfg, univer
 	debug.ServerRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, exporter)
 	common.RegisterCountableForIngester("exporter", exporter, stats.OptionStatTags{
 		"type": "prometheus", "index": strconv.Itoa(index)})
+
+	lokiConfig, err := exporter.buildLokiConfig()
+	if err != nil {
+		log.Errorf("build loki config failed: %v", err)
+	}
+	if lokiConfig != nil {
+		client, err := loki.New(*lokiConfig)
+		if err != nil {
+			log.Errorf("new loki client err: %v", err)
+		} else {
+			exporter.lokiClient = client
+		}
+	}
 	log.Infof("prometheus exporter %d created", index)
 	return exporter
+}
+
+func (e *PrometheusExporter) buildLokiConfig() (*loki.Config, error) {
+	config := &loki.Config{
+		TenantID:  e.cfg.LokiTenantID,
+		BatchWait: time.Second * time.Duration(e.cfg.MaxMessageWaitSecond),
+		BatchSize: int(e.cfg.MaxMessageBytes),
+		Timeout:   time.Second * 3,
+		BackoffConfig: backoff.BackoffConfig{
+			MinBackoff: time.Second * time.Duration(e.cfg.MinBackoffSecond),
+			MaxBackoff: time.Second * time.Duration(e.cfg.MaxBackoffSecond),
+			MaxRetries: int(e.cfg.MaxRetries),
+		},
+	}
+	var url urlutil.URLValue
+	err := url.Set(e.cfg.LokiURL)
+	if err != nil {
+		return config, errors.New("url is invalid")
+	}
+	config.URL = url
+	return config, nil
 }
 
 func (e *PrometheusExporter) Start() {
@@ -306,16 +348,19 @@ func (e *PrometheusExporter) queueProcess(queueID int) {
 					"request_endpoint":  endpoint,
 					"request_protocol":  datatype.L7Protocol(f.L7Protocol).String(),
 				}
+				latency := float64((f.EndTime() - f.StartTime()).Milliseconds())
 				switch datatype.L7Protocol(f.L7Protocol) {
 				case datatype.L7_PROTOCOL_HTTP_1, datatype.L7_PROTOCOL_HTTP_2, datatype.L7_PROTOCOL_HTTP_1_TLS, datatype.L7_PROTOCOL_HTTP_2_TLS, datatype.L7_PROTOCOL_GRPC:
-					e.deepFlowRemoteRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+					e.deepFlowRemoteRequestHist.With(label).Observe(latency)
 				case datatype.L7_PROTOCOL_MYSQL, datatype.L7_PROTOCOL_POSTGRE, datatype.L7_PROTOCOL_MONGODB:
-					e.deepFlowDatabaseRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+					e.deepFlowDatabaseRequestHist.With(label).Observe(latency)
 				case datatype.L7_PROTOCOL_KAFKA, datatype.L7_PROTOCOL_MQTT:
-					e.deepFlowMQRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+					e.deepFlowMQRequestHist.With(label).Observe(latency)
 				case datatype.L7_PROTOCOL_REDIS:
-					e.deepFlowCacheRequestHist.With(label).Observe(float64((f.EndTime() - f.StartTime()).Milliseconds()))
+					e.deepFlowCacheRequestHist.With(label).Observe(latency)
 				}
+
+				e.ReportEventLog(f, serviceName, namespace, cluster, endpoint, latency)
 				f.Release()
 			default:
 				continue
@@ -369,4 +414,70 @@ func (e *PrometheusExporter) getEndpoint(l7 *log_data.L7FlowLog) string {
 
 func (e *PrometheusExporter) HandleSimpleCommand(op uint16, arg string) string {
 	return fmt.Sprintf("prometheus exporter %d last 10s counter: %+v", e.index, e.lastCounter)
+}
+
+// ReportEventLog compose a log and report to loki.
+// Logs would be sampled:
+// Logs with error: 100% sampled.
+// Logs with long duration / high latency: 100% sampled.
+// Others: 0.1% sampled.
+func (e *PrometheusExporter) ReportEventLog(f *log_data.L7FlowLog, serviceName, namespace, cluster, endpoint string, latency float64) {
+	// Sampling
+	flag := false
+
+	latencyThreshold := 999999999.0
+	if datatype.L7Protocol(f.L7Protocol) == datatype.L7_PROTOCOL_MYSQL {
+		latencyThreshold = 3000.0
+	} else if datatype.L7Protocol(f.L7Protocol) == datatype.L7_PROTOCOL_REDIS {
+		latencyThreshold = 100.0
+	} else {
+		// mute other logs for now.
+		return
+	}
+
+	if latency > latencyThreshold {
+		flag = true
+	}
+
+	switch datatype.LogMessageStatus(f.ResponseStatus) {
+	case datatype.STATUS_CLIENT_ERROR, datatype.STATUS_SERVER_ERROR, datatype.STATUS_ERROR:
+		flag = true
+	default:
+		flag = flag || (rand.Intn(10000) < 10)
+	}
+
+	if !flag {
+		return
+	}
+
+	level := "INFO"
+	switch datatype.LogMessageStatus(f.ResponseStatus) {
+	case datatype.STATUS_CLIENT_ERROR, datatype.STATUS_SERVER_ERROR, datatype.STATUS_ERROR:
+		level = "ERROR"
+	}
+
+	labels := model.LabelSet{
+		"request_status":    model.LabelValue(level),
+		"service_name":      model.LabelValue(serviceName),
+		"service_namespace": model.LabelValue(namespace),
+		"service_cluster":   model.LabelValue(cluster),
+		"request_endpoint":  model.LabelValue(endpoint),
+		"request_protocol":  model.LabelValue(datatype.L7Protocol(f.L7Protocol).String()),
+	}
+	t := time.UnixMicro(f.EndTime().Microseconds())
+	defaultLogHeaderFormat := `time="%s",log_level="%s",`
+
+	logHeader := fmt.Sprintf(defaultLogHeaderFormat, t, level)
+	logBody := ""
+	switch datatype.L7Protocol(f.L7Protocol) {
+	case datatype.L7_PROTOCOL_MYSQL:
+		logBody = f.RequestResource
+	case datatype.L7_PROTOCOL_REDIS:
+		logBody = f.RequestType
+	}
+
+	if e.lokiClient != nil {
+		e.lokiClient.Handle(labels, t, logHeader+logBody)
+	}
+	return
 }

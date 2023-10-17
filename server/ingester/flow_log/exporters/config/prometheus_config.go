@@ -46,6 +46,22 @@ type PrometheusExporterConfig struct {
 	QueueCount int `yaml:"queue-count"`
 	QueueSize  int `yaml:"queue-size"`
 
+	// loki config
+	LokiURL      string `yaml:"loki-url"`
+	LokiTenantID string `yaml:"loki-tenant-id"`
+	// MaxMessageWaitSecond maximum wait period before sending batch of message
+	MaxMessageWaitSecond int64 `yaml:"max-message-wait-second"`
+	// MaxMessageBytes maximum batch size of message to accrue before sending
+	MaxMessageBytes int64 `yaml:"max-message-bytes"`
+	// TimeoutSecond maximum time to wait for server to respond
+	TimeoutSecond int64 `yaml:"timeout-second"`
+	// MinBackoffSecond minimum backoff time between retries
+	MinBackoffSecond int64 `yaml:"min-backoff-second"`
+	// MaxBackoffSecond maximum backoff time between retries
+	MaxBackoffSecond int64 `yaml:"max-backoff-second"`
+	// MaxRetries maximum number of retries when sending batches
+	MaxRetries int64 `yaml:"max-retries"`
+
 	OverridableCfg `yaml:",inline"`
 }
 
