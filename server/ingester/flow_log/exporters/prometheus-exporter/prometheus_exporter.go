@@ -468,9 +468,9 @@ func (e *PrometheusExporter) ReportEventLog(f *log_data.L7FlowLog, serviceName, 
 		"request_protocol":  model.LabelValue(datatype.L7Protocol(f.L7Protocol).String()),
 	}
 	t := time.UnixMicro(f.EndTime().Microseconds())
-	defaultLogHeaderFormat := `time="%s",log_level="%s",duration="%.2f",`
+	defaultLogHeaderFormat := `time="%s",log_level="%s",duration="%dms",`
 
-	logHeader := fmt.Sprintf(defaultLogHeaderFormat, t, level, latency)
+	logHeader := fmt.Sprintf(defaultLogHeaderFormat, t, level, int(latency))
 	logBody := ""
 	switch datatype.L7Protocol(f.L7Protocol) {
 	case datatype.L7_PROTOCOL_MYSQL:
