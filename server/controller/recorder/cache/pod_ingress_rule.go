@@ -17,9 +17,8 @@
 package cache
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPodIngressRule(dbItem *mysql.PodIngressRule, seq int) {
@@ -30,20 +29,15 @@ func (b *DiffBaseDataSet) addPodIngressRule(dbItem *mysql.PodIngressRule, seq in
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, b.PodIngressRules[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngressRule(lcuuid string) {
 	delete(b.PodIngressRules, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_RULE_EN, lcuuid))
 }
 
 type PodIngressRule struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-}
-
-func (p *PodIngressRule) Update(cloudItem *cloudmodel.PodIngressRule) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_RULE_EN, p))
 }

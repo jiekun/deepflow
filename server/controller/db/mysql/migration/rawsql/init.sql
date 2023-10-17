@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS prometheus_target (
     other_labels        TEXT COMMENT 'separated by ,',
     domain              CHAR(64) DEFAULT '',
     sub_domain          CHAR(64) DEFAULT '',
+    pod_cluster_id      INTEGER,
     create_method       TINYINT(1) DEFAULT 1 COMMENT '1.recorder learning 2.prometheus learning',
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          DATETIME NOT NULL ON UPDATE CURRENT_TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -2043,6 +2044,7 @@ TRUNCATE TABLE ch_pod_ns;
 CREATE TABLE IF NOT EXISTS ch_pod_group (
     id                      INTEGER NOT NULL PRIMARY KEY,
     name                    VARCHAR(256),
+    pod_group_type          INTEGER DEFAULT NULL,
     icon_id                 INTEGER,
     updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2600,18 +2602,17 @@ CREATE TABLE IF NOT EXISTS prometheus_label_name (
 TRUNCATE TABLE prometheus_label_name;
 
 CREATE TABLE IF NOT EXISTS prometheus_label_value (
-    `id`            INT(10) NOT NULL PRIMARY KEY,
-    `value`         VARCHAR(256) NOT NULL UNIQUE,
+    `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `value`         TEXT,
     `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-)ENGINE=innodb DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+)ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label_value;
 
 CREATE TABLE IF NOT EXISTS prometheus_label (
     `id`            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `name`          VARCHAR(256) NOT NULL,
-    `value`         VARCHAR(256) NOT NULL,
-    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE INDEX label(name, value)
+    `value`         TEXT,
+    `created_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 )ENGINE=innodb AUTO_INCREMENT=1 DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 TRUNCATE TABLE prometheus_label;
 
@@ -2666,7 +2667,7 @@ TRUNCATE TABLE ch_pod_k8s_envs;
 CREATE TABLE IF NOT EXISTS ch_app_label (
     `label_name_id`      INT(10) NOT NULL,
     `label_value_id`     INT(10) NOT NULL,
-    `label_value`        VARCHAR(256) NOT NULL,
+    `label_value`        TEXT,
     `updated_at`         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (label_name_id, label_value_id)
 )ENGINE=innodb DEFAULT CHARSET=utf8;
@@ -2718,3 +2719,4 @@ CREATE TABLE IF NOT EXISTS ch_view_change (
 )ENGINE=innodb DEFAULT CHARSET=utf8;
 TRUNCATE TABLE ch_view_change;
 INSERT INTO ch_view_change () VALUES ();
+

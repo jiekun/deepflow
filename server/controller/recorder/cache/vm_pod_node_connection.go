@@ -17,9 +17,8 @@
 package cache
 
 import (
-	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addVMPodNodeConnection(dbItem *mysql.VMPodNodeConnection, seq int) {
@@ -30,20 +29,15 @@ func (b *DiffBaseDataSet) addVMPodNodeConnection(dbItem *mysql.VMPodNodeConnecti
 		},
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, b.VMPodNodeConnections[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteVMPodNodeConnection(lcuuid string) {
 	delete(b.VMPodNodeConnections, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, lcuuid))
 }
 
 type VMPodNodeConnection struct {
 	DiffBase
 	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
-}
-
-func (p *VMPodNodeConnection) Update(cloudItem *cloudmodel.VMPodNodeConnection) {
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_VM_POD_NODE_CONNECTION_EN, p))
 }

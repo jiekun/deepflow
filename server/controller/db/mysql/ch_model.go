@@ -224,9 +224,10 @@ type ChPodCluster struct {
 }
 
 type ChPodGroup struct {
-	ID     int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
-	Name   string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
-	IconID int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
+	ID           int    `gorm:"primaryKey;column:id;type:int;not null" json:"ID"`
+	Name         string `gorm:"column:name;type:varchar(256);not null" json:"NAME"`
+	PodGroupType int    `gorm:"column:pod_group_type;type:int;default:null" json:"POD_GROUP_TYPE"`
+	IconID       int    `gorm:"column:icon_id;type:int;default:null" json:"ICON_ID"`
 }
 
 type ChPodNamespace struct {
@@ -448,7 +449,7 @@ type ChPrometheusMetricAPPLabelLayout struct {
 type ChAPPLabel struct {
 	LabelNameID  int    `gorm:"primaryKey;column:label_name_id;type:int;not null" json:"LABEL_NAME_ID"`
 	LabelValueID int    `gorm:"primaryKey;column:label_value_id;type:int unsigned;not null" json:"LABEL_VALUE_ID"`
-	LabelValue   string `gorm:"column:label_value;type:varchar(256);not null" json:"LABEL_VALUE"`
+	LabelValue   string `gorm:"column:label_value;type:text;not null" json:"LABEL_VALUE"`
 }
 
 func (ChAPPLabel) TableName() string {

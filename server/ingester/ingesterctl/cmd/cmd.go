@@ -100,6 +100,7 @@ func RegisterIngesterCommand(root *cobra.Command) {
 	}))
 
 	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_OTLP_EXPORTER, debug.CmdHelper{"stats", "show otlp exporter stats"}, nil))
+	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, debug.CmdHelper{"platformData", "show otlp platformData"}, nil))
 	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_EXPORTER_PLATFORMDATA, debug.CmdHelper{"platformData", "show exporter platformData"}, nil))
 	otlpCmd.AddCommand(debug.ClientRegisterSimple(ingesterctl.CMD_PROMETHEUS_EXPORTER, debug.CmdHelper{"stats", "show prometheus exporter stats"}, nil))
 

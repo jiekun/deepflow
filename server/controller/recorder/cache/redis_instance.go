@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int) {
@@ -32,13 +32,14 @@ func (b *DiffBaseDataSet) addRedisInstance(dbItem *mysql.RedisInstance, seq int)
 		State:        dbItem.State,
 		PublicHost:   dbItem.PublicHost,
 		RegionLcuuid: dbItem.Region,
+		AZLcuuid:     dbItem.AZ,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, b.RedisInstances[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deleteRedisInstance(lcuuid string) {
 	delete(b.RedisInstances, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, lcuuid))
 }
 
 type RedisInstance struct {
@@ -56,5 +57,5 @@ func (r *RedisInstance) Update(cloudItem *cloudmodel.RedisInstance) {
 	r.PublicHost = cloudItem.PublicHost
 	r.RegionLcuuid = cloudItem.RegionLcuuid
 	r.AZLcuuid = cloudItem.AZLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_REDIS_INSTANCE_EN, r))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_REDIS_INSTANCE_EN, r))
 }

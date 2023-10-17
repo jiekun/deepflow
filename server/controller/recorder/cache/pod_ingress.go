@@ -18,8 +18,8 @@ package cache
 
 import (
 	cloudmodel "github.com/deepflowio/deepflow/server/controller/cloud/model"
+	ctrlrcommon "github.com/deepflowio/deepflow/server/controller/common"
 	"github.com/deepflowio/deepflow/server/controller/db/mysql"
-	. "github.com/deepflowio/deepflow/server/controller/recorder/common"
 )
 
 func (b *DiffBaseDataSet) addPodIngress(dbItem *mysql.PodIngress, seq int) {
@@ -33,12 +33,12 @@ func (b *DiffBaseDataSet) addPodIngress(dbItem *mysql.PodIngress, seq int) {
 		AZLcuuid:        dbItem.AZ,
 		SubDomainLcuuid: dbItem.SubDomain,
 	}
-	b.GetLogFunc()(addDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]))
+	b.GetLogFunc()(addDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, b.PodIngresses[dbItem.Lcuuid]))
 }
 
 func (b *DiffBaseDataSet) deletePodIngress(lcuuid string) {
 	delete(b.PodIngresses, lcuuid)
-	log.Info(deleteDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, lcuuid))
+	log.Info(deleteDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, lcuuid))
 }
 
 type PodIngress struct {
@@ -46,13 +46,12 @@ type PodIngress struct {
 	Name            string `json:"name"`
 	RegionLcuuid    string `json:"region_lcuuid"`
 	AZLcuuid        string `json:"az_lcuuid"`
-	SubDomainLcuuid string `json:"sub_domain_lcuu"`
+	SubDomainLcuuid string `json:"sub_domain_lcuuid"`
 }
 
 func (p *PodIngress) Update(cloudItem *cloudmodel.PodIngress) {
 	p.Name = cloudItem.Name
 	p.RegionLcuuid = cloudItem.RegionLcuuid
 	p.AZLcuuid = cloudItem.AZLcuuid
-	p.SubDomainLcuuid = cloudItem.SubDomainLcuuid
-	log.Info(updateDiffBase(RESOURCE_TYPE_POD_INGRESS_EN, p))
+	log.Info(updateDiffBase(ctrlrcommon.RESOURCE_TYPE_POD_INGRESS_EN, p))
 }

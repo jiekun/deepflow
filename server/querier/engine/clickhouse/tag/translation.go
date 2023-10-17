@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/deepflowio/deepflow/server/querier/common"
 )
 
@@ -53,10 +55,14 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 		for _, suffix := range []string{"", "_0", "_1"} {
 			resourceIDSuffix := resourceStr + "_id" + suffix
 			resourceNameSuffix := resourceStr + suffix
+			groupNotNullFilter := ""
+			if !slices.Contains[string]([]string{"region", "az", "subnet", "pod_cluster"}, resourceStr) {
+				groupNotNullFilter = resourceIDSuffix + "!=0"
+			}
 			tagResourceMap[resourceIDSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"",
-					resourceIDSuffix+"!=0",
+					groupNotNullFilter,
 					"",
 					"",
 				),
@@ -64,7 +70,7 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			tagResourceMap[resourceNameSuffix] = map[string]*Tag{
 				"default": NewTag(
 					"dictGet(flow_tag."+resourceStr+"_map, 'name', (toUInt64("+resourceIDSuffix+")))",
-					resourceIDSuffix+"!=0",
+					groupNotNullFilter,
 					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE name %s %s)",
 					"toUInt64("+resourceIDSuffix+") IN (SELECT id FROM flow_tag."+resourceStr+"_map WHERE %s(name,%s))",
 				),
@@ -870,6 +876,25 @@ func GenerateTagResoureMap() map[string]map[string]*Tag {
 			"",
 			"",
 		)}
+	// pod_group_type
+	for _, suffix := range []string{"", "_0", "_1"} {
+		podGroupIDSuffix := "pod_group_id" + suffix
+		podGroupTypeSuffix := "pod_group_type" + suffix
+		tagResourceMap[podGroupTypeSuffix] = map[string]*Tag{
+			"default": NewTag(
+				"dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))",
+				"",
+				"toUInt64("+podGroupIDSuffix+") IN (SELECT id FROM flow_tag.pod_group_map WHERE pod_group_type %s %s)",
+				"",
+			),
+			"enum": NewTag(
+				"dictGetOrDefault(flow_tag.int_enum_map, 'name', ('%s',toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))), dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+"))))",
+				"",
+				"toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE name %s %s and tag_name='%s')",
+				"toUInt64(dictGet(flow_tag.pod_group_map, 'pod_group_type', (toUInt64("+podGroupIDSuffix+")))) IN (SELECT value FROM flow_tag.int_enum_map WHERE %s(name,%s) and tag_name='%s')",
+			),
+		}
+	}
 	// enum_tag
 	for _, enumName := range INT_ENUM_TAG {
 		tagResourceMap[enumName] = map[string]*Tag{

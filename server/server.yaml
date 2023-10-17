@@ -24,6 +24,9 @@ controller:
   #listen-node-port: 30417
   ## grpc server port
   #grpc-port: 20035
+  #ssl-grpc-port: 20135
+  #agent_ssl_cert_file: /etc/ssl/server.key
+  #agent_ssl_key_file: /etc/ssl/server.pem
   #ingester-port: 20033
   #grpc-node-port: 30035
   # grpc max message lenth default 100M
@@ -167,7 +170,13 @@ controller:
         resource_max_id_0: 64000
         # 资源ID限制：所有设备ID（除宿主机外）、容器节点、Ingress、工作负载、ReplicaSet、POD
         resource_max_id_1: 499999
-
+        # local debug log
+        log_debug: 
+          enabled: false
+          detail_enabled: false
+          resource_type:
+          #  - all
+          #  - vpc
   tagrecorder:
     # size of data in batch operation for MySQL
     mysql_batch_size: 1000
