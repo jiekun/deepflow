@@ -248,7 +248,7 @@ func (e *PrometheusExporter) buildLokiConfig() (*loki.Config, error) {
 			MaxRetries: int(e.cfg.MaxRetries),
 		},
 		ExternalLabels: labelutil.LabelSet{
-			LabelSet: map[model.LabelName]model.LabelValue{"log_by": "deepflow_prom_exporter"},
+			LabelSet: map[model.LabelName]model.LabelValue{"env": model.LabelValue(e.cfg.Namespace)},
 		},
 	}
 	var url urlutil.URLValue
