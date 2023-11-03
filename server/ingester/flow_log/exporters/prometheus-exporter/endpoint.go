@@ -91,7 +91,7 @@ func GetHTTPEndpoint(requestDomain, requestResource string) (string, string) {
 func GetMongoEndpoint(ipv4 net.IP, requestResource string) (string, string) {
 	targetIP := ""
 	if len(ipv4) > 0 {
-		targetIP = ipv4.String() + " "
+		targetIP = ipv4.String()
 	}
 	// todo requestResource is too long and hard to parse.
 	// Provide targetIP as basic information. And look for a proper endpoint in future release.
