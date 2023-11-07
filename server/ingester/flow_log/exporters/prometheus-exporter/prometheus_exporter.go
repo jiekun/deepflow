@@ -432,8 +432,11 @@ func (e *PrometheusExporter) ReportEventLog(f *log_data.L7FlowLog, serviceName, 
 	latencyThreshold := 999999999.0
 	sampleRate := 0
 	if datatype.L7Protocol(f.L7Protocol) == datatype.L7_PROTOCOL_MYSQL {
-		latencyThreshold = 3000.0
+		latencyThreshold = 1000.0
 		sampleRate = 1000
+	} else if datatype.L7Protocol(f.L7Protocol) == datatype.L7_PROTOCOL_MONGODB {
+		latencyThreshold = 1000.0
+		sampleRate = 3000
 	} else if datatype.L7Protocol(f.L7Protocol) == datatype.L7_PROTOCOL_REDIS {
 		latencyThreshold = 100.0
 		sampleRate = 100
@@ -480,6 +483,12 @@ func (e *PrometheusExporter) ReportEventLog(f *log_data.L7FlowLog, serviceName, 
 		logBody = f.RequestResource
 	case datatype.L7_PROTOCOL_REDIS:
 		logBody = f.RequestResource
+	case datatype.L7_PROTOCOL_MONGODB:
+		logBody = f.RequestResource
+	}
+
+	if level == "ERROR" {
+		logBody += ", error: " + f.ResponseException
 	}
 
 	if e.lokiClient != nil {
